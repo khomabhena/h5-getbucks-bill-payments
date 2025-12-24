@@ -64,9 +64,25 @@ const AccountInput = () => {
   );
   const fieldName = creditPartyIdentifier?.Name || 'AccountNumber';
 
-  // Get customer details (placeholder - will be replaced with Getbucks user info)
-  const getCustomerDetails = () => {
-    // TODO: Get from Getbucks Bank user info
+  // Get customer details from bridge (native/iframe/mock)
+  const getCustomerDetails = async () => {
+    try {
+      const { getUserInfo } = await import('../services/paymentBridge');
+      const userInfo = await getUserInfo();
+      
+      if (userInfo) {
+        return {
+          CustomerId: userInfo.CustomerId || userInfo.id || userInfo.userId || '1',
+          Fullname: userInfo.Fullname || userInfo.name || userInfo.fullName || 'Customer',
+          MobileNumber: userInfo.MobileNumber || userInfo.phoneNumber || userInfo.msisdn || '+263777077921',
+          EmailAddress: userInfo.EmailAddress || userInfo.email || null
+        };
+      }
+    } catch (error) {
+      console.warn('Could not get user info from bridge:', error);
+    }
+    
+    // Fallback to default
     return {
       CustomerId: '1',
       Fullname: 'Customer',
@@ -103,7 +119,7 @@ const AccountInput = () => {
 
     try {
       const amountValue = parseFloat(currentAmount) || 0;
-      const customerDetails = getCustomerDetails();
+      const customerDetails = await getCustomerDetails();
 
       const validationPayload = {
         RequestId: requestId,

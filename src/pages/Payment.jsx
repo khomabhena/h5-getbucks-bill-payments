@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button, Header, PageWrapper, Icon, Card } from '../components';
-import { processGetbucksPayment } from '../services/bankPaymentService';
+import { processPayment } from '../services/paymentBridge';
 import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
 
@@ -56,19 +56,21 @@ const Payment = () => {
     });
     
     try {
-      // Process payment through Getbucks Bank (Mock)
-      const getbucksPaymentData = {
+      // Process payment using appropriate bridge (native/iframe/mock)
+      const paymentData = {
         amount,
         currency: product?.Currency || product?.currency || 'USD',
         accountValue,
         product,
-        provider
+        provider,
+        country,
+        service
       };
 
-      const getbucksResult = await processGetbucksPayment(getbucksPaymentData);
+      const paymentResult = await processPayment(paymentData);
 
-      if (!getbucksResult.success) {
-        throw new Error(getbucksResult.message || 'Payment failed');
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.message || 'Payment failed');
       }
 
       // Payment successful
@@ -78,14 +80,26 @@ const Payment = () => {
         tone: 'success'
       });
 
+      // Notify parent if in iframe mode
+      const { getMode } = await import('../utils/modeDetection');
+      const { iframeBridge } = await import('../utils/iframeBridge');
+      if (getMode() === 'iframe') {
+        await iframeBridge.notifyPaymentComplete({
+          transactionId: paymentResult.transactionId,
+          amount: paymentResult.amount,
+          currency: paymentResult.currency,
+          status: paymentResult.status
+        });
+      }
+
       // Navigate to confirmation with payment result
       navigate(ROUTES.CONFIRMATION, {
         state: {
-          // Getbucks payment result
-          getbucksPayment: getbucksResult,
-          transactionId: getbucksResult.transactionId,
-          paymentStatus: getbucksResult.status,
-          timestamp: getbucksResult.timestamp,
+          // Payment result
+          getbucksPayment: paymentResult,
+          transactionId: paymentResult.transactionId,
+          paymentStatus: paymentResult.status,
+          timestamp: paymentResult.timestamp,
           
           // Original payment data
           country,
