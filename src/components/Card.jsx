@@ -1,0 +1,30 @@
+import React from 'react';
+
+/**
+ * Card Component - Consistent card styling
+ * Follows the app's design system
+ */
+const Card = ({ 
+  children, 
+  className = '', 
+  padding = 'p-6',
+  margin = 'mb-6',
+  onClick = null
+}) => {
+  const baseStyles = 'bg-white rounded-xl shadow-sm border border-gray-200';
+  const interactiveStyles = onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : '';
+  
+  const Component = onClick ? 'button' : 'div';
+  
+  return (
+    <Component
+      className={`${baseStyles} ${padding} ${margin} ${interactiveStyles} ${className}`}
+      onClick={onClick}
+    >
+      {children}
+    </Component>
+  );
+};
+
+export default Card;
+
