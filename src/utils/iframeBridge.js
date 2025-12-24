@@ -45,12 +45,36 @@ class IframeBridge {
   }
 
   /**
+   * Allowed parent origins (whitelist)
+   */
+  getAllowedOrigins() {
+    return [
+      'https://tapseed-h5-hub.vercel.app',
+      'https://tapseed-h5-hub-staging.vercel.app',
+      // Add other allowed origins as needed
+    ];
+  }
+
+  /**
+   * Check if origin is allowed
+   */
+  isOriginAllowed(origin) {
+    const allowed = this.getAllowedOrigins();
+    // Also allow if it matches the detected parent origin
+    if (this.parentOrigin && origin === this.parentOrigin) {
+      return true;
+    }
+    // Check against whitelist
+    return allowed.some(allowedOrigin => origin === allowedOrigin || origin.startsWith(allowedOrigin));
+  }
+
+  /**
    * Handle incoming messages from parent
    */
   handleMessage(event) {
-    // Validate origin (in production, check against whitelist)
-    if (this.parentOrigin && event.origin !== this.parentOrigin) {
-      console.warn('Message from unauthorized origin:', event.origin);
+    // Validate origin against whitelist
+    if (!this.isOriginAllowed(event.origin)) {
+      console.warn('Message from unauthorized origin:', event.origin, 'Allowed:', this.getAllowedOrigins());
       return;
     }
 
