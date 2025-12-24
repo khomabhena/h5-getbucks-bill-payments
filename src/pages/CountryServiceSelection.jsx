@@ -115,26 +115,26 @@ const CountryServiceSelection = () => {
 
   return (
     <PageWrapper>
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen safe-area-inset">
         {/* Header */}
         <Header title="Bill Payments" showBackButton={false} />
 
         {/* Main Content - Scrollable */}
-        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-40 overflow-y-auto">
+        <div className="flex-1 px-3 sm:px-4 py-4 sm:py-6 max-w-md mx-auto w-full pb-32 sm:pb-40 overflow-y-auto">
           {/* Welcome Section */}
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <div className="text-center mb-6 sm:mb-8">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1.5 sm:mb-2">
               Pay Your Bills
             </h2>
-            <p className="text-sm text-gray-600">
+            <p className="text-xs sm:text-sm text-gray-600">
               Select country and service type
             </p>
           </div>
 
           {/* Country Selection Section */}
-          <Card className="mb-6">
-            <div className="mb-4">
-              <p className="text-sm font-medium text-gray-700 mb-3">
+          <Card className="mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4">
+              <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2.5 sm:mb-3">
                 Select Country
                 {loadingCountries && <span className="ml-2 text-xs text-gray-500">Loading...</span>}
               </p>
@@ -145,14 +145,15 @@ const CountryServiceSelection = () => {
                 placeholder="Search country..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                icon={<Icon name="search" size={20} className="text-gray-400" />}
+                icon={<Icon name="search" size={18} className="text-gray-400" />}
                 rightIcon={
                   searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="text-gray-400 hover:text-gray-600 p-1 touch-manipulation"
+                      aria-label="Clear search"
                     >
-                      <Icon name="close" size={20} />
+                      <Icon name="close" size={18} />
                     </button>
                   )
                 }
@@ -160,17 +161,17 @@ const CountryServiceSelection = () => {
             </div>
 
             {loadingCountries ? (
-              <div className="text-center py-8">
-                <Icon name="refresh" size={32} className="text-[#faa819] animate-spin mx-auto mb-2" />
-                <p className="text-gray-500 text-sm">Loading countries...</p>
+              <div className="text-center py-6 sm:py-8">
+                <Icon name="refresh" size={28} className="text-[#faa819] animate-spin mx-auto mb-2 sm:mb-2" />
+                <p className="text-gray-500 text-xs sm:text-sm">Loading countries...</p>
               </div>
             ) : (
               <>
                 {/* Popular Countries Section (only when no search) */}
                 {!searchQuery && filteredCountries.some(c => POPULAR_COUNTRIES.includes(c.countryCode)) && (
-                  <div className="mb-4">
+                  <div className="mb-3 sm:mb-4">
                     <p className="text-xs text-gray-500 mb-2">Popular</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
                       {filteredCountries
                         .filter(c => POPULAR_COUNTRIES.includes(c.countryCode))
                         .map((country) => (
@@ -180,8 +181,9 @@ const CountryServiceSelection = () => {
                             selected={selectedCountry?.countryCode === country.countryCode}
                             size="sm"
                             icon={<Flag countryCode={country.countryCode} size="lg" />}
+                            className="touch-manipulation min-h-[60px] sm:min-h-[70px]"
                           >
-                            {country.countryName}
+                            <span className="text-xs sm:text-sm leading-tight">{country.countryName}</span>
                           </SelectionButton>
                         ))}
                     </div>
@@ -192,7 +194,7 @@ const CountryServiceSelection = () => {
                 {!searchQuery && !showAllCountries && filteredCountries.some(c => !POPULAR_COUNTRIES.includes(c.countryCode)) && (
                   <button
                     onClick={() => setShowAllCountries(true)}
-                    className="w-full py-2 text-sm text-[#faa819] font-medium hover:bg-gray-50 rounded-lg transition-colors"
+                    className="w-full py-2.5 sm:py-2 text-xs sm:text-sm text-[#faa819] font-medium hover:bg-gray-50 rounded-lg transition-colors touch-manipulation min-h-[44px]"
                   >
                     Show All Countries ({filteredCountries.filter(c => !POPULAR_COUNTRIES.includes(c.countryCode)).length})
                   </button>
@@ -212,7 +214,7 @@ const CountryServiceSelection = () => {
                         <p className="text-xs text-gray-500">All Countries</p>
                         <button
                           onClick={() => setShowAllCountries(false)}
-                          className="text-xs text-[#faa819] font-medium hover:underline"
+                          className="text-xs text-[#faa819] font-medium hover:underline touch-manipulation py-1 px-2"
                         >
                           Show Less
                         </button>
@@ -220,11 +222,11 @@ const CountryServiceSelection = () => {
                     )}
                     
                     {filteredCountries.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500 text-sm">
+                      <div className="text-center py-6 sm:py-8 text-gray-500 text-xs sm:text-sm">
                         No countries found matching "{searchQuery}"
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 max-h-64 overflow-y-auto">
                         {filteredCountries
                           .filter(c => {
                             // When searching, show all filtered results
@@ -238,8 +240,9 @@ const CountryServiceSelection = () => {
                               selected={selectedCountry?.countryCode === country.countryCode}
                               size="sm"
                               icon={<Flag countryCode={country.countryCode} size="lg" />}
+                              className="touch-manipulation min-h-[60px] sm:min-h-[70px]"
                             >
-                              {country.countryName}
+                              <span className="text-xs sm:text-sm leading-tight">{country.countryName}</span>
                             </SelectionButton>
                           ))}
                       </div>
@@ -251,27 +254,27 @@ const CountryServiceSelection = () => {
           </Card>
 
           {/* Service Selection Section */}
-          <Card className="mb-6">
-            <p className="text-sm font-medium text-gray-700 mb-3">
+          <Card className="mb-4 sm:mb-6">
+            <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2.5 sm:mb-3">
               Select Service
               {loadingServices && <span className="ml-2 text-xs text-gray-500">Loading...</span>}
             </p>
             
             {!selectedCountry ? (
-              <div className="text-center py-8 text-gray-500 text-sm">
+              <div className="text-center py-6 sm:py-8 text-gray-500 text-xs sm:text-sm">
                 Please select a country first
               </div>
             ) : loadingServices ? (
-              <div className="text-center py-8">
-                <Icon name="refresh" size={32} className="text-[#faa819] animate-spin mx-auto mb-2" />
-                <p className="text-gray-500 text-sm">Loading services...</p>
+              <div className="text-center py-6 sm:py-8">
+                <Icon name="refresh" size={28} className="text-[#faa819] animate-spin mx-auto mb-2" />
+                <p className="text-gray-500 text-xs sm:text-sm">Loading services...</p>
               </div>
             ) : services.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 text-sm">
+              <div className="text-center py-6 sm:py-8 text-gray-500 text-xs sm:text-sm">
                 No services available for this country
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
                 {services.map((service) => (
                   <SelectionButton
                     key={service.Id}
@@ -279,8 +282,9 @@ const CountryServiceSelection = () => {
                     selected={selectedService?.Id === service.Id}
                     size="md"
                     iconName={getServiceIconName(service.Name)}
+                    className="touch-manipulation min-h-[80px] sm:min-h-[90px]"
                   >
-                    {service.Name}
+                    <span className="text-xs sm:text-sm leading-tight">{service.Name}</span>
                   </SelectionButton>
                 ))}
               </div>
@@ -288,7 +292,7 @@ const CountryServiceSelection = () => {
           </Card>
 
           {/* Info Text */}
-          <p className="text-xs text-center text-gray-500 mb-4">
+          <p className="text-xs text-center text-gray-500 mb-3 sm:mb-4 px-2">
             Secure payment powered by Getbucks Bank
           </p>
         </div>
@@ -296,7 +300,7 @@ const CountryServiceSelection = () => {
         {/* Fixed Button at Bottom */}
         <div 
           style={{ backgroundColor: colors.background.secondary }} 
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 pb-6 shadow-lg z-40"
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 sm:p-4 pb-safe sm:pb-6 shadow-lg z-40 safe-area-inset-bottom"
         >
           <div className="max-w-md mx-auto">
             <Button
@@ -305,6 +309,7 @@ const CountryServiceSelection = () => {
               loading={loadingServices}
               fullWidth
               size="lg"
+              className="touch-manipulation min-h-[48px] sm:min-h-[52px]"
             >
               Continue
             </Button>

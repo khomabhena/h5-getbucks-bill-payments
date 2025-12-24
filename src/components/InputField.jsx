@@ -65,10 +65,12 @@ const InputField = ({
           maxLength={maxLength}
           {...props}
           className={`
-            w-full px-4 py-3 rounded-lg border-2 transition-all duration-200
+            w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border-2 transition-all duration-200
             focus:outline-none focus:ring-2 focus:ring-offset-1
-            ${icon ? 'pl-10' : ''}
-            ${rightIcon ? 'pr-10' : ''}
+            text-sm sm:text-base
+            touch-manipulation
+            ${icon ? 'pl-9 sm:pl-10' : ''}
+            ${rightIcon ? 'pr-9 sm:pr-10' : ''}
             ${hasError 
               ? 'border-red-300 focus:border-red-500 focus:ring-red-500 bg-red-50' 
               : 'border-gray-200 focus:border-[#faa819] focus:ring-[#faa819] bg-white'

@@ -7,12 +7,12 @@ import React from 'react';
 const Card = ({ 
   children, 
   className = '', 
-  padding = 'p-6',
+  padding = 'p-4 sm:p-6',
   margin = 'mb-6',
   onClick = null
 }) => {
   const baseStyles = 'bg-white rounded-xl shadow-sm border border-gray-200';
-  const interactiveStyles = onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : '';
+  const interactiveStyles = onClick ? 'cursor-pointer hover:shadow-md transition-shadow touch-manipulation' : '';
   
   const Component = onClick ? 'button' : 'div';
   
