@@ -65,7 +65,7 @@ const InputField = ({
           maxLength={maxLength}
           {...props}
           className={`
-            w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border-2 transition-all duration-200
+            w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border transition-all duration-200
             focus:outline-none focus:ring-2 focus:ring-offset-1
             text-sm sm:text-base
             touch-manipulation

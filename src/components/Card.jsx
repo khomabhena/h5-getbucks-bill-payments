@@ -11,8 +11,8 @@ const Card = ({
   margin = 'mb-6',
   onClick = null
 }) => {
-  const baseStyles = 'bg-white rounded-xl shadow-sm border border-gray-200';
-  const interactiveStyles = onClick ? 'cursor-pointer hover:shadow-md transition-shadow touch-manipulation' : '';
+  const baseStyles = 'bg-white rounded-xl border border-gray-200';
+  const interactiveStyles = onClick ? 'cursor-pointer transition-all touch-manipulation' : '';
   
   const Component = onClick ? 'button' : 'div';
   

@@ -49,14 +49,11 @@ const ProductCard = ({
         w-full text-left relative overflow-hidden
         rounded-xl transition-all duration-200 active:scale-[0.98]
         ${selected
-          ? 'bg-white shadow-lg border-2 border-[#faa819]'
-          : 'bg-white shadow-sm border-2 border-gray-200 hover:shadow-md hover:border-gray-300'
+          ? 'bg-white border border-[#faa819]'
+          : 'bg-white border border-gray-200 hover:border-gray-300'
         }
         ${className}
       `}
-      style={selected ? {
-        boxShadow: '0 4px 12px rgba(250, 168, 25, 0.15)'
-      } : {}}
     >
       {/* Left Accent Border */}
       <div 

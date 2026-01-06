@@ -26,7 +26,7 @@ const SelectionButton = ({
     <button
       onClick={onClick}
       className={`
-        rounded-lg border-2 transition-all duration-200 text-left
+        rounded-lg border transition-all duration-200 text-left
         ${selected
           ? 'border-[#faa819] bg-[#f7f2ec]'
           : 'border-gray-200 bg-white hover:border-gray-300'

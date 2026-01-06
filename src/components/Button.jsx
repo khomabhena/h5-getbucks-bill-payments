@@ -17,12 +17,12 @@ const Button = ({
   type = 'button',
   fullWidth = false
 }) => {
-  const baseStyles = 'font-semibold shadow-lg rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]';
+  const baseStyles = 'font-semibold rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]';
   
   const variants = {
     primary: `text-white ${disabled ? 'bg-gray-400' : 'bg-[#faa819] hover:bg-[#d6890a]'} focus:ring-[#faa819]`,
     secondary: `text-[#2c3e50] ${disabled ? 'bg-gray-200' : 'bg-[#f7f2ec] hover:bg-[#ede5d8]'} focus:ring-[#faa819]`,
-    outline: `text-[#faa819] border-2 ${disabled ? 'border-gray-300' : 'border-[#faa819] hover:bg-[#faa819] hover:text-white'} focus:ring-[#faa819]`,
+    outline: `text-[#faa819] border ${disabled ? 'border-gray-300' : 'border-[#faa819] hover:bg-[#faa819] hover:text-white'} focus:ring-[#faa819]`,
     ghost: `text-[#faa819] ${disabled ? 'text-gray-400' : 'hover:bg-[#f7f2ec]'} focus:ring-[#faa819]`
   };
   
