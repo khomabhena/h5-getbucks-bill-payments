@@ -6,7 +6,7 @@ import Icon from './Icon';
  * Reusable Input Field Component
  * Mobile-first, accessible, with error states and icons
  */
-const InputField = ({
+const InputField = React.forwardRef(({
   type = 'text',
   label,
   value,
@@ -25,7 +25,7 @@ const InputField = ({
   maxLength = null,
   onFocus = null,
   ...props
-}) => {
+}, ref) => {
   const hasError = error !== null && error !== '';
   const inputId = `input-${label?.toLowerCase().replace(/\s+/g, '-') || 'field'}`;
 
@@ -53,6 +53,7 @@ const InputField = ({
 
         {/* Input */}
         <input
+          ref={ref}
           id={inputId}
           type={type}
           value={value}
@@ -110,7 +111,9 @@ const InputField = ({
       )}
     </div>
   );
-};
+});
+
+InputField.displayName = 'InputField';
 
 export default InputField;
 

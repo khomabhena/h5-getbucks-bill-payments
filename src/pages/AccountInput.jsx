@@ -20,6 +20,8 @@ const AccountInput = () => {
   const [validationError, setValidationError] = useState(null);
   const validationTimeoutRef = useRef(null);
   const currentValidationRequestRef = useRef(null);
+  const accountInputRef = useRef(null);
+  const cursorPositionRef = useRef(null);
 
   // Calculate if amount is fixed
   const minAmount = product?.MinimumAmount || product?.MinAmount || 0;
@@ -176,6 +178,44 @@ const AccountInput = () => {
     }
   }, [product, fieldName, currency]);
 
+  // Track if input was focused before validation
+  const wasFocusedRef = useRef(false);
+  const validatingRef = useRef(validating);
+  
+  // Keep validating ref in sync
+  useEffect(() => {
+    validatingRef.current = validating;
+  }, [validating]);
+  
+  // Save focus state and cursor position when typing
+  const handleAccountInputFocus = () => {
+    wasFocusedRef.current = true;
+  };
+  
+  const handleAccountInputBlur = () => {
+    // Only mark as not focused if user clicked outside (not during validation)
+    if (!validatingRef.current) {
+      wasFocusedRef.current = false;
+    }
+  };
+
+  // Restore focus and cursor position after validation completes
+  useEffect(() => {
+    // Only restore focus when validation completes (not during validation)
+    if (!validating && wasFocusedRef.current && accountInputRef.current && cursorPositionRef.current !== null) {
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        if (accountInputRef.current) {
+          accountInputRef.current.focus();
+          const position = cursorPositionRef.current;
+          if (position !== null && position <= accountValue.length) {
+            accountInputRef.current.setSelectionRange(position, position);
+          }
+        }
+      });
+    }
+  }, [validating, accountValue.length]);
+
   // Debounced validation - trigger 1 second after user stops typing
   useEffect(() => {
     if (validationTimeoutRef.current) {
@@ -262,11 +302,17 @@ const AccountInput = () => {
           {/* Account Input Field */}
           <Card className="mb-4">
             <InputField
+              ref={accountInputRef}
               type="text"
               label={fieldLabel}
               placeholder={`Enter ${fieldLabel.toLowerCase()}`}
               value={accountValue}
-              onChange={(e) => setAccountValue(e.target.value)}
+              onChange={(e) => {
+                cursorPositionRef.current = e.target.selectionStart;
+                setAccountValue(e.target.value);
+              }}
+              onFocus={handleAccountInputFocus}
+              onBlur={handleAccountInputBlur}
               error={validationError && !validating ? validationError : null}
               loading={validating}
               required
