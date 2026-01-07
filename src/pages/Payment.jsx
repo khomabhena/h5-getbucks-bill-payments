@@ -210,9 +210,9 @@ const Payment = () => {
         <Header title="Complete Payment" showBackButton={true} />
         
         {/* Main Content - Scrollable */}
-        <div className="flex-1 py-6 max-w-md mx-auto w-full px-4 pb-40 overflow-y-auto">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto">
           {/* Order Summary */}
-          <div className="relative overflow-hidden rounded-xl bg-white shadow-lg border-2 border-gray-100 mb-6">
+          <div className="relative overflow-hidden rounded-xl bg-white border border-gray-200 mb-6">
             {/* Top Accent Bar */}
             <div 
               className="h-1 w-full"
@@ -275,7 +275,7 @@ const Payment = () => {
                 
                 {/* Total Price - Highlighted */}
                 <div 
-                  className="mt-4 pt-4 border-t-2 rounded-lg p-4"
+                  className="mt-4 pt-4 border-t rounded-lg p-4"
                   style={{ 
                     borderColor: colors.app.primaryLight,
                     backgroundColor: colors.app.primaryLight + '20'
@@ -344,7 +344,7 @@ const Payment = () => {
         {/* Fixed Button at Bottom */}
         <div 
           style={{ backgroundColor: colors.background.secondary }} 
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-6 z-40"
+          className="fixed bottom-0 left-0 right-0 bg-white pb-6 z-40"
         >
           <div className="max-w-md mx-auto px-4 pt-4">
             <Button

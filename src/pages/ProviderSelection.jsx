@@ -100,7 +100,7 @@ const ProviderSelection = () => {
         <Header title="Select Provider" showBackButton={true} />
 
         {/* Main Content - Scrollable */}
-        <div className="flex-1 py-6 max-w-md mx-auto w-full px-4 pb-40 overflow-y-auto">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto">
           {/* Service Info */}
           <div className="mb-6">
             <Card>
@@ -184,7 +184,7 @@ const ProviderSelection = () => {
         {/* Fixed Button at Bottom */}
         <div 
           style={{ backgroundColor: colors.background.secondary }} 
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-6 z-40"
+          className="fixed bottom-0 left-0 right-0 bg-white pb-6 z-40"
         >
           <div className="max-w-md mx-auto px-4 pt-4">
             <Button

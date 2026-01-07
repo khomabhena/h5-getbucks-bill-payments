@@ -8,7 +8,7 @@ import { colors } from '../data/colors';
 const PageWrapper = ({ children, className = '' }) => {
   return (
     <div 
-      className={`min-h-screen ${className}`}
+      className={`min-h-screen pt-8 ${className}`}
       style={{ backgroundColor: colors.background.secondary }}
     >
       {children}

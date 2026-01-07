@@ -84,7 +84,7 @@ const CountryServiceSelection = () => {
         <Header title="Bill Payments" showBackButton={false} />
 
         {/* Main Content - Scrollable */}
-        <div className="flex-1 py-4 sm:py-6 max-w-md mx-auto w-full px-3 sm:px-4 pb-32 sm:pb-40 overflow-y-auto">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto">
           {/* Welcome Section */}
           <div className="text-center mb-6 sm:mb-8">
             <p className="text-xs sm:text-sm text-gray-600">
@@ -150,7 +150,7 @@ const CountryServiceSelection = () => {
         {/* Fixed Button at Bottom */}
         <div 
           style={{ backgroundColor: colors.background.secondary }} 
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe sm:pb-6 z-40 safe-area-inset-bottom"
+          className="fixed bottom-0 left-0 right-0 bg-white pb-safe sm:pb-6 z-40 safe-area-inset-bottom"
         >
           <div className="max-w-md mx-auto px-3 sm:px-4 pt-3 sm:pt-4">
             <Button
