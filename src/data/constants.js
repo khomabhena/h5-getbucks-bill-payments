@@ -2,7 +2,7 @@
  * Application Constants
  */
 
-export const APP_NAME = 'Getbucks Bill Payments';
+export const APP_NAME = 'GetBucks Bill Payments';
 
 export const ROUTES = {
   HOME: '/',

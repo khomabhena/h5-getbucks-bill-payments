@@ -1,6 +1,6 @@
 /**
  * Design System
- * Centralized design tokens for Getbucks Bill Payments app
+ * Centralized design tokens for GetBucks Bill Payments app
  */
 
 export const designSystem = {

@@ -103,8 +103,8 @@ const processIframePayment = async (paymentData) => {
  */
 const processMockPayment = async (paymentData) => {
   // Import mock service
-  const { processGetbucksPayment } = await import('./bankPaymentService');
-  return processGetbucksPayment(paymentData);
+  const { processGetBucksPayment } = await import('./bankPaymentService');
+  return processGetBucksPayment(paymentData);
 };
 
 /**

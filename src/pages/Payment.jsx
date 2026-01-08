@@ -51,7 +51,7 @@ const Payment = () => {
     setError(null);
     setStatusCard({
       title: 'Processing Payment',
-      message: 'Completing payment through Getbucks Bank…',
+      message: 'Completing payment through GetBucks Bank…',
       tone: 'info'
     });
     
@@ -337,7 +337,7 @@ const Payment = () => {
 
           {/* Info Text */}
           <p className="text-xs text-center text-gray-500 mb-4">
-            Secure payment powered by Getbucks Bank
+            Secure payment powered by GetBucks Bank
           </p>
         </div>
 

@@ -1,11 +1,11 @@
-// Getbucks Bank Brand Colors
+// GetBucks Bank Brand Colors
 // Primary: #faa819 (Orange/Gold)
 // Background: #fafafa (Whitish/Light Gray)
 
 export const colors = {
-  // App primary colors - Getbucks Bank Brand
+  // App primary colors - GetBucks Bank Brand
   app: {
-    primary: '#faa819',           // Getbucks Orange/Gold (Primary Brand Color)
+    primary: '#faa819',           // GetBucks Orange/Gold (Primary Brand Color)
     primaryLight: '#fdd085',      // Light Orange/Gold
     primaryDark: '#d6890a',       // Dark Orange/Gold
     primaryDarker: '#b8730a',     // Darker Orange/Gold
@@ -34,7 +34,7 @@ export const colors = {
       200: '#e5e5e5',            // Light gray
     },
     gradient: {
-      orange: 'from-#faa819 to-#d6890a',      // Getbucks orange gradient
+      orange: 'from-#faa819 to-#d6890a',      // GetBucks orange gradient
       warm: 'from-#fafafa to-#ffffff',       // Whitish to white gradient
     }
   },

@@ -135,9 +135,9 @@ const AccountInput = () => {
         Currency: currency,
         CustomerDetails: customerDetails,
         POSDetails: {
-          CashierId: 'Getbucks',
-          StoreId: 'Getbucks',
-          TerminalId: 'Getbucks'
+          CashierId: 'GetBucks',
+          StoreId: 'GetBucks',
+          TerminalId: 'GetBucks'
         },
         ProductId: product.Id || product.id,
         Quantity: 1

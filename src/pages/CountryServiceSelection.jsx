@@ -94,7 +94,7 @@ const CountryServiceSelection = () => {
 
           {/* Country Display (Read-only) */}
           {selectedCountry && (
-            <Card className="mb-4 sm:mb-6">
+            <Card className="mb-4 hidden sm:mb-6">
               <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2.5 sm:mb-3">
                 Country
               </p>
@@ -143,7 +143,7 @@ const CountryServiceSelection = () => {
 
           {/* Info Text */}
           <p className="text-xs text-center text-gray-500 mb-3 sm:mb-4 px-2">
-            Secure payment powered by Getbucks Bank
+            Secure payment powered by GetBucks Bank
           </p>
         </div>
 

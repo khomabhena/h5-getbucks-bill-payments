@@ -452,7 +452,7 @@ const Confirmation = () => {
 
           {/* Info Text */}
           <p className="text-xs text-center text-gray-500 mb-4">
-            Thank you for using Getbucks Bill Payments
+            Thank you for using GetBucks Bill Payments
           </p>
         </div>
 
