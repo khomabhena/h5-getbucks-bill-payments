@@ -28,7 +28,7 @@ const SelectionButton = ({
       className={`
         rounded-lg border transition-all duration-200 text-left
         ${selected
-          ? 'border-[#faa819] bg-[#f7f2ec]'
+          ? 'border-[#faa819] bg-gray-100'
           : 'border-gray-200 bg-white hover:border-gray-300'
         }
         ${sizeClasses[size]}

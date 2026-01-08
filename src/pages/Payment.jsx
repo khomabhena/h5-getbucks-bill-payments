@@ -210,7 +210,7 @@ const Payment = () => {
         <Header title="Complete Payment" showBackButton={true} />
         
         {/* Main Content - Scrollable */}
-        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto border-x border-gray-200">
           {/* Order Summary */}
           <div className="relative overflow-hidden rounded-xl bg-white border border-gray-200 mb-6">
             {/* Top Accent Bar */}

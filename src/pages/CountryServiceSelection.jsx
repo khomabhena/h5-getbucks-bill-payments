@@ -84,7 +84,7 @@ const CountryServiceSelection = () => {
         <Header title="Bill Payments" showBackButton={false} />
 
         {/* Main Content - Scrollable */}
-        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto border-x border-gray-200">
           {/* Welcome Section */}
           <div className="text-center mb-6 sm:mb-8">
             <p className="text-xs sm:text-sm text-gray-600">

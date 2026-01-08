@@ -123,7 +123,7 @@ const ProductSelection = () => {
         <Header title="Select Product" showBackButton={true} />
 
         {/* Main Content - Scrollable */}
-        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto border-x border-gray-200">
           {/* Provider Info */}
           <div className="mb-6">
             <Card>
@@ -149,11 +149,9 @@ const ProductSelection = () => {
 
           {/* Products Section */}
           <Card className="mb-6">
-            {loading && (
-              <p className="text-sm font-medium text-gray-700 mb-3">
-                <span className="text-xs text-gray-500">Loading...</span>
-              </p>
-            )}
+            <h2 className="text-base font-semibold text-gray-900 mb-4">
+              Available Products
+            </h2>
             
             {loading ? (
               <div className="text-center py-8">
@@ -177,7 +175,7 @@ const ProductSelection = () => {
                 No products available for this provider
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-6 mt-2">
                 {products.map((product) => {
                   const productId = product.Id || product.id;
                   const selectedId = selectedProduct?.Id || selectedProduct?.id;

@@ -1,6 +1,6 @@
 // Getbucks Bank Brand Colors
 // Primary: #faa819 (Orange/Gold)
-// Background: #f7f2ec (Warm Beige/Cream)
+// Background: #fafafa (Whitish/Light Gray)
 
 export const colors = {
   // App primary colors - Getbucks Bank Brand
@@ -14,9 +14,9 @@ export const colors = {
 
   // Text colors
   text: {
-    primary: '#2c3e50',          // Dark Blue-Grey (main text)
-    secondary: '#5a6c7d',        // Medium Grey
-    tertiary: '#8b9aab',         // Light Grey
+    primary: '#1a1a1a',          // Near black (main text) - better contrast on white
+    secondary: '#4b5563',        // Dark gray (body text)
+    tertiary: '#6b7280',         // Medium gray (muted text)
     inverse: '#ffffff',           // White text
     black: '#1a1a1a',            // Near black
     button: '#ffffff',            // White text on orange buttons
@@ -25,23 +25,24 @@ export const colors = {
   // Background colors
   background: {
     primary: '#ffffff',           // White background
-    secondary: '#f7f2ec',         // Warm Beige/Cream (Brand Background)
-    tertiary: '#faf8f5',         // Very light beige
+    secondary: '#fafafa',         // Whitish/Light gray background
+    tertiary: '#f5f5f5',         // Very light gray
+    selected: '#fff7ed',          // Very light orange/amber for selected items
     gray: {
-      50: '#f7f2ec',             // Warm Beige (Brand Background)
-      100: '#ede5d8',            // Light beige
-      200: '#d4c9b8',            // Medium beige
+      50: '#fafafa',             // Whitish background
+      100: '#f5f5f5',            // Very light gray
+      200: '#e5e5e5',            // Light gray
     },
     gradient: {
       orange: 'from-#faa819 to-#d6890a',      // Getbucks orange gradient
-      warm: 'from-#f7f2ec to-#ffffff',       // Warm to white gradient
+      warm: 'from-#fafafa to-#ffffff',       // Whitish to white gradient
     }
   },
 
   // Border colors
   border: {
-    primary: '#e5ddd0',          // Light beige border
-    secondary: '#d4c9b8',        // Medium beige border
+    primary: '#e5e7eb',          // Light gray border
+    secondary: '#d1d5db',        // Medium gray border
     accent: '#faa819',          // Orange accent border
     focus: '#faa819',           // Orange focus border
     error: '#ef4444',           // Red border

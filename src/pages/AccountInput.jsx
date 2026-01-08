@@ -275,7 +275,7 @@ const AccountInput = () => {
         <Header title={`Enter ${fieldLabel}`} showBackButton={true} />
 
         {/* Main Content - Scrollable */}
-        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto border-x border-gray-200">
           {/* Product Info */}
           <div className="mb-6">
             <Card>

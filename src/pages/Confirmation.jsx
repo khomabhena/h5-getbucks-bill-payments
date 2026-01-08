@@ -102,7 +102,7 @@ const Confirmation = () => {
         <Header title={isPaymentSuccessful ? "Payment Successful" : "Payment Status"} showBackButton={false} />
         
         {/* Main Content - Scrollable */}
-        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto border-x border-gray-200">
           {/* Success Header */}
           {isPaymentSuccessful && (
             <div className="text-center mb-6">
