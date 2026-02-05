@@ -1,0 +1,601 @@
+ <!DOCTYPE html>
+<html>
+<head>
+<title>EMAIL_RESPONSE_DRAFT.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<h2 id="confirmed-understanding">Confirmed Understanding</h2>
+<p><strong>The Flow:</strong></p>
+<ol>
+<li>We will provide iBank with client credentials (<code>clientId</code> and <code>clientSecret</code>)</li>
+<li>iBank will call our token endpoint (<code>POST /api/token/request</code>) with these credentials</li>
+<li>We will validate the credentials and return a secure token + the iframe URL</li>
+<li>iBank will embed our app in an iframe using the tokenized URL</li>
+<li>Our app will validate the token server-side before serving the content</li>
+</ol>
+<p><strong>Your Team's Work:</strong></p>
+<ul>
+<li>Integrate token request into iBank mobile app/Internet Banking</li>
+<li><strong>Provide account number and client number</strong> from the logged-in user's session</li>
+<li><strong>Append these parameters</strong> (<code>accountNumber</code>, <code>clientNumber</code>) along with the token to the iframe URL</li>
+<li>Display our app in an iframe with the complete URL</li>
+<li>Handle token refresh if needed</li>
+</ul>
+<p><strong>Our Work:</strong></p>
+<ul>
+<li>Build the token generation endpoint</li>
+<li>Implement server-side token validation</li>
+<li>Provide API documentation and credentials</li>
+</ul>
+<h2 id="application-overview">Application Overview</h2>
+<p>As referenced in our integration guide, we have two H5 applications ready for integration:</p>
+<ul>
+<li><strong>Airtime Top-Up App</strong>: https://h5-getbucks-airtime.vercel.app</li>
+<li><strong>Bill Payments App</strong>: https://h5-getbucks-bill-payments.vercel.app</li>
+</ul>
+<p>Both applications support iframe embedding and are designed to work with the token-based security system we're implementing.</p>
+<h2 id="what-well-build">What We'll Build</h2>
+<h3 id="1-token-generation-endpoint">1. Token Generation Endpoint</h3>
+<p><strong>Endpoint</strong>: <code>POST /api/token/request</code></p>
+<p><strong>Request</strong>:</p>
+<pre class="hljs"><code><div>{
+  <span class="hljs-attr">"clientId"</span>: <span class="hljs-string">"ibank-client-id"</span>,
+  <span class="hljs-attr">"clientSecret"</span>: <span class="hljs-string">"ibank-client-secret"</span>,
+  <span class="hljs-attr">"app"</span>: <span class="hljs-string">"bill-payments"</span>,
+  <span class="hljs-attr">"userId"</span>: <span class="hljs-string">"optional-user-id"</span>
+}
+</div></code></pre>
+<p><strong>Request Parameters</strong>:</p>
+<ul>
+<li><code>clientId</code> (string, required): Client ID provided by us</li>
+<li><code>clientSecret</code> (string, required): Client secret provided by us</li>
+<li><code>app</code> (string, required): Application identifier - specifies which app to access
+<ul>
+<li><strong>Available options</strong>:
+<ul>
+<li><code>&quot;airtime&quot;</code> - Airtime Top-Up App</li>
+<li><code>&quot;bill-payments&quot;</code> - Bill Payments App</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><code>userId</code> (string, optional): User identifier for session tracking</li>
+</ul>
+<p><strong>Response</strong>:</p>
+<pre class="hljs"><code><div>{
+  <span class="hljs-attr">"success"</span>: <span class="hljs-literal">true</span>,
+  <span class="hljs-attr">"token"</span>: <span class="hljs-string">"jwt-token-here"</span>,
+  <span class="hljs-attr">"expiresIn"</span>: <span class="hljs-number">3600</span>,
+  <span class="hljs-attr">"baseUrl"</span>: <span class="hljs-string">"https://h5-getbucks-bill-payments.vercel.app"</span>,
+  <span class="hljs-attr">"app"</span>: <span class="hljs-string">"bill-payments"</span>
+}
+</div></code></pre>
+<p><strong>Response Fields</strong>:</p>
+<ul>
+<li><code>token</code> (string): JWT token for iframe security</li>
+<li><code>expiresIn</code> (number): Token expiration time in seconds (3600 = 1 hour)</li>
+<li><code>baseUrl</code> (string): Base URL for the requested app</li>
+<li><code>app</code> (string): Confirmation of which app the token is for</li>
+</ul>
+<p><strong>Available Apps</strong>:</p>
+<ul>
+<li><strong>Airtime Top-Up</strong>: <code>app: &quot;airtime&quot;</code> → <code>baseUrl: &quot;https://h5-getbucks-airtime.vercel.app&quot;</code></li>
+<li><strong>Bill Payments</strong>: <code>app: &quot;bill-payments&quot;</code> → <code>baseUrl: &quot;https://h5-getbucks-bill-payments.vercel.app&quot;</code></li>
+</ul>
+<p><strong>Important</strong>:</p>
+<ul>
+<li>iBank must specify which app they want to access using the <code>app</code> parameter</li>
+<li>The response returns the <code>baseUrl</code> for the specified app and <code>token</code></li>
+<li><strong>iBank must append the required parameters</strong> (<code>accountNumber</code>, <code>clientNumber</code>, etc.) when constructing the iframe URL</li>
+</ul>
+<h3 id="2-token-validation">2. Token Validation</h3>
+<ul>
+<li>Server-side validation before serving the app</li>
+<li>Token expiration handling (suggested: 1 hour lifetime)</li>
+<li>Secure token format</li>
+</ul>
+<h3 id="3-ibank-implementation-constructing-the-iframe-url">3. iBank Implementation: Constructing the Iframe URL</h3>
+<p><strong>iBank is responsible for providing and appending the following parameters to the iframe URL:</strong></p>
+<p><strong>Required Parameters</strong> (must be appended by iBank):</p>
+<ul>
+<li><code>token</code> - The security token received from the token endpoint</li>
+<li><code>accountNumber</code> - Customer account number (debit account) - <strong>provided by iBank, must be appended</strong></li>
+<li><code>mode</code> - Integration mode: <code>iframe</code> (for Internet Banking) or <code>native</code> (for Mobile App)</li>
+</ul>
+<p><strong>Recommended Parameters</strong> (should be appended by iBank):</p>
+<ul>
+<li><code>clientNumber</code> - Client number for account transfer creation - <strong>provided by iBank</strong></li>
+<li><code>returnUrl</code> - URL to redirect after transaction completion (optional)</li>
+</ul>
+<p><strong>Implementation Steps for iBank:</strong></p>
+<ol>
+<li>
+<p><strong>Request Token</strong> (specify which app to access):</p>
+<pre class="hljs"><code><div>POST /api/token/request
+{
+  <span class="hljs-string">"clientId"</span>: <span class="hljs-string">"ibank-client-id"</span>,
+  <span class="hljs-string">"clientSecret"</span>: <span class="hljs-string">"ibank-client-secret"</span>,
+  <span class="hljs-string">"app"</span>: <span class="hljs-string">"bill-payments"</span>  <span class="hljs-comment">// or "airtime" for Airtime Top-Up app</span>
+}
+</div></code></pre>
+<p><strong>App Options</strong>:</p>
+<ul>
+<li><code>&quot;airtime&quot;</code> - For Airtime Top-Up App</li>
+<li><code>&quot;bill-payments&quot;</code> - For Bill Payments App</li>
+</ul>
+</li>
+<li>
+<p><strong>Receive Response</strong> (includes baseUrl for the requested app):</p>
+<pre class="hljs"><code><div>{
+  <span class="hljs-attr">"success"</span>: <span class="hljs-literal">true</span>,
+  <span class="hljs-attr">"token"</span>: <span class="hljs-string">"jwt-token-here"</span>,
+  <span class="hljs-attr">"expiresIn"</span>: <span class="hljs-number">3600</span>,
+  <span class="hljs-attr">"baseUrl"</span>: <span class="hljs-string">"https://h5-getbucks-bill-payments.vercel.app"</span>,
+  <span class="hljs-attr">"app"</span>: <span class="hljs-string">"bill-payments"</span>
+}
+</div></code></pre>
+<p><strong>Note</strong>: The <code>baseUrl</code> will match the app specified in the request:</p>
+<ul>
+<li>If <code>app: &quot;airtime&quot;</code> → <code>baseUrl: &quot;https://h5-getbucks-airtime.vercel.app&quot;</code></li>
+<li>If <code>app: &quot;bill-payments&quot;</code> → <code>baseUrl: &quot;https://h5-getbucks-bill-payments.vercel.app&quot;</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Construct Iframe URL</strong> (iBank appends parameters):</p>
+<pre class="hljs"><code><div><span class="hljs-comment">// iBank constructs the complete URL</span>
+<span class="hljs-keyword">const</span> accountNumber = getCurrentUserAccountNumber(); <span class="hljs-comment">// From iBank system</span>
+<span class="hljs-keyword">const</span> clientNumber = getCurrentUserClientNumber();  <span class="hljs-comment">// From iBank system</span>
+<span class="hljs-keyword">const</span> token = response.token;                        <span class="hljs-comment">// From token endpoint</span>
+<span class="hljs-keyword">const</span> baseUrl = response.baseUrl;                    <span class="hljs-comment">// From token endpoint</span>
+
+<span class="hljs-keyword">const</span> iframeUrl = <span class="hljs-string">`<span class="hljs-subst">${baseUrl}</span>?token=<span class="hljs-subst">${token}</span>&amp;mode=iframe&amp;accountNumber=<span class="hljs-subst">${accountNumber}</span>&amp;clientNumber=<span class="hljs-subst">${clientNumber}</span>`</span>;
+</div></code></pre>
+</li>
+<li>
+<p><strong>Embed in Iframe</strong>:</p>
+<pre class="hljs"><code><div><span class="hljs-tag">&lt;<span class="hljs-name">iframe</span> 
+  <span class="hljs-attr">src</span>=<span class="hljs-string">"https://h5-getbucks-bill-payments.vercel.app/?token=jwt-token-here&amp;mode=iframe&amp;accountNumber=00001203&amp;clientNumber=023557"</span>
+  <span class="hljs-attr">width</span>=<span class="hljs-string">"100%"</span>
+  <span class="hljs-attr">height</span>=<span class="hljs-string">"600px"</span>
+  <span class="hljs-attr">frameborder</span>=<span class="hljs-string">"0"</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">iframe</span>&gt;</span>
+</div></code></pre>
+</li>
+</ol>
+<p><strong>Example Complete URL</strong> (constructed by iBank):</p>
+<pre class="hljs"><code><div>https://h5-getbucks-bill-payments.vercel.app/?token=jwt-token-here&amp;mode=iframe&amp;accountNumber=00001203&amp;clientNumber=023557
+</div></code></pre>
+<p><strong>Note</strong>:</p>
+<ul>
+<li><code>accountNumber</code> and <code>clientNumber</code> are <strong>provided by iBank</strong> from their system (logged-in user's account details)</li>
+<li>These parameters <strong>must be appended</strong> to the URL by iBank when embedding the iframe</li>
+<li>The token endpoint only provides the <code>token</code> and <code>baseUrl</code> - iBank constructs the complete URL</li>
+</ul>
+<h2 id="bankwaregetbucks-bank-api-authentication">BankWare/GetBucks Bank API Authentication</h2>
+<p>The applications need to authenticate with the GetBucks Bank Account Transfer API (BankWare) to process payments. We need to understand how iBank will provide these authentication credentials.</p>
+<p><strong>Required Information from iBank:</strong></p>
+<p>Please clarify how you will provide the OAuth credentials needed for BankWare API authentication:</p>
+<ol>
+<li>
+<p><strong>OAuth Credentials Format</strong>:</p>
+<ul>
+<li><code>username</code>: API username for BankWare</li>
+<li><code>password</code>: API password for BankWare</li>
+<li><code>systemId</code>: System identifier</li>
+<li><code>grant_type</code>: OAuth grant type (typically &quot;password&quot;)</li>
+</ul>
+</li>
+<li>
+<p><strong>Credential Delivery Method</strong>:</p>
+<ul>
+<li>Will these be provided directly to us for configuration?</li>
+<li>Should they be passed via URL parameters?</li>
+<li>Will iBank handle the OAuth token acquisition and pass the access token?</li>
+<li>Or another method?</li>
+</ul>
+</li>
+<li>
+<p><strong>Token Management</strong>:</p>
+<ul>
+<li>Who will manage OAuth token acquisition and refresh?</li>
+<li>Should the app request tokens from iBank, or will iBank provide pre-authenticated tokens?</li>
+<li>What is the expected token lifetime?</li>
+</ul>
+</li>
+</ol>
+<p><strong>Current App Behavior:</strong>
+The apps are configured to obtain OAuth tokens from the GetBucks Bank <code>/token</code> endpoint using the credentials above. However, we need to know if iBank will:</p>
+<ul>
+<li>Provide the credentials for us to configure</li>
+<li>Handle OAuth token acquisition and pass tokens to the app</li>
+<li>Use a different authentication method</li>
+</ul>
+<p>Please advise on your preferred approach for BankWare API authentication.</p>
+<h2 id="questions-for-clarification">Questions for Clarification</h2>
+<ol>
+<li><strong>Token Lifetime</strong>: Is 1 hour expiration acceptable, or do you prefer a different duration?</li>
+<li><strong>Client Credentials Exchange</strong>: How would you like to securely exchange the <code>clientId</code> and <code>clientSecret</code> for the iframe token endpoint? (Secure channel, encrypted email, etc.)</li>
+<li><strong>BankWare API Authentication</strong>: <strong>Please clarify how iBank will provide OAuth credentials for BankWare/GetBucks Bank Account Transfer API:</strong>
+<ul>
+<li>Will you provide the OAuth credentials (username, password, systemId) directly to us for configuration?</li>
+<li>Or will iBank handle OAuth token acquisition and pass access tokens to the app?</li>
+<li>What is your preferred method for providing these credentials?</li>
+</ul>
+</li>
+<li><strong>User Context</strong>: Should tokens include user-specific information, or be session-based only?</li>
+<li><strong>Token Refresh</strong>: When a token expires, should iBank automatically request a new one, or handle it manually?</li>
+<li><strong>Account Information</strong>: Please confirm that iBank will provide <code>accountNumber</code> and <code>clientNumber</code> from the logged-in user's session and append them to the iframe URL as outlined above.</li>
+</ol>
+<h2 id="next-steps">Next Steps</h2>
+<ol>
+<li>Please confirm the approach above</li>
+<li>Let us know your preferences for the questions above</li>
+<li>We'll provide the client credentials once ready</li>
+<li>Coordinate testing once both sides are implemented</li>
+</ol>
+<p>We're ready to proceed once we have your confirmation. Please let me know if you have any questions or concerns.</p>
+<hr>
+
+</body>
+</html>
