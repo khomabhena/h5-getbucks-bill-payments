@@ -9,40 +9,93 @@ import Confirmation from './pages/Confirmation';
 import { ROUTES } from './data/constants';
 import { getMode, getUrlParams } from './utils/modeDetection';
 import { iframeBridge } from './utils/iframeBridge';
+import { SessionProvider, useSession } from './context/SessionContext';
 
-function App() {
+const AppShell = () => {
+  const { tokenStatus, setTokenData, setTokenStatus } = useSession();
+
   useEffect(() => {
-    // Initialize iframe bridge if in iframe mode
     const mode = getMode();
     const params = getUrlParams();
-    
+
     console.log('App initialized in mode:', mode, params);
-    
-    if (mode === 'iframe') {
-      // Request token if not in URL
-      if (!params.token) {
-        iframeBridge.requestToken().then((response) => {
-          if (response?.token) {
-            console.log('Token received from parent');
-            // Store token if needed (avoid localStorage for security)
-            // You can use a context or state management here
-          }
-        }).catch((error) => {
-          console.warn('Could not get token from parent:', error);
-        });
+
+    const validateToken = async (token) => {
+      const apiBaseUrl =
+        import.meta.env.VITE_TOKEN_API_BASE_URL || 'https://4.222.185.132.nip.io/vas';
+      const response = await fetch(
+        `${apiBaseUrl}/api/validate-token?token=${encodeURIComponent(token)}`
+      );
+      if (!response.ok) {
+        throw new Error('Invalid token');
       }
-      
-      // Listen for user info updates
+      const data = await response.json();
+      return data?.payload || null;
+    };
+
+    const init = async () => {
+      if (mode !== 'iframe') {
+        setTokenStatus('valid');
+        return;
+      }
+
+      setTokenStatus('loading');
+
+      try {
+        let token = params.token;
+        if (!token) {
+          const response = await iframeBridge.requestToken();
+          token = response?.token;
+        }
+
+        if (!token) {
+          setTokenStatus('invalid');
+          return;
+        }
+
+        const payload = await validateToken(token);
+        setTokenData({
+          token,
+          sessionId: payload?.sessionID || payload?.sessionId || null,
+          tokenPayload: payload,
+          accountNumber: params.accountNumber || null,
+          clientNumber: params.clientNumber || null,
+        });
+        setTokenStatus('valid');
+      } catch (error) {
+        console.warn('Token validation failed:', error);
+        setTokenStatus('invalid');
+      }
+    };
+
+    if (mode === 'iframe') {
       iframeBridge.on('USER_UPDATE', (data) => {
         console.log('User info updated:', data);
       });
-      
-      // Listen for config updates
+
       iframeBridge.on('CONFIG_UPDATE', (data) => {
         console.log('Config updated:', data);
       });
     }
-  }, []);
+
+    init();
+  }, [setTokenData, setTokenStatus]);
+
+  if (getMode() === 'iframe' && tokenStatus === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-gray-600">
+        Validating session...
+      </div>
+    );
+  }
+
+  if (getMode() === 'iframe' && tokenStatus === 'invalid') {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-gray-600 px-6 text-center">
+        Session expired or invalid. Please refresh and request a new token.
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -56,6 +109,14 @@ function App() {
         <Route path="*" element={<CountryServiceSelection />} />
       </Routes>
     </Router>
+  );
+};
+
+function App() {
+  return (
+    <SessionProvider>
+      <AppShell />
+    </SessionProvider>
   );
 }
 

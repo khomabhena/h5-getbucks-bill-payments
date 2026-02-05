@@ -14,14 +14,17 @@ export const processGetBucksPayment = async (paymentData) => {
   // TODO: Replace with actual GetBucks Bank API call
   // This is a placeholder that simulates payment processing
   
-  const { amount, currency, accountValue, product, provider } = paymentData;
+  const { amount, currency, accountValue, product, provider, sessionID, accountNumber, clientNumber } = paymentData;
   
   console.log('Processing GetBucks payment:', {
     amount,
     currency,
     accountValue,
     productId: product?.Id || product?.id,
-    providerName: provider?.Name || provider?.name
+    providerName: provider?.Name || provider?.name,
+    sessionID: sessionID || null,
+    accountNumber: accountNumber || null,
+    clientNumber: clientNumber || null
   });
 
   // Simulate API delay

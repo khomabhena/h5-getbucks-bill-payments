@@ -4,6 +4,7 @@ import { Button, Header, PageWrapper, Icon, Card } from '../components';
 import { processPayment } from '../services/paymentBridge';
 import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
+import { useSession } from '../context/SessionContext';
 
 // Local currency formatter (code + rounded amount)
 const formatCurrencyDisplay = (amount, currency = 'USD') => {
@@ -21,6 +22,7 @@ const Payment = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [statusCard, setStatusCard] = useState(null);
+  const { sessionId, accountNumber, clientNumber } = useSession();
 
   // Redirect if no required data
   useEffect(() => {
@@ -64,7 +66,10 @@ const Payment = () => {
         product,
         provider,
         country,
-        service
+        service,
+        sessionID: sessionId || null,
+        accountNumber: accountNumber || null,
+        clientNumber: clientNumber || null
       };
 
       const paymentResult = await processPayment(paymentData);
@@ -88,7 +93,10 @@ const Payment = () => {
           transactionId: paymentResult.transactionId,
           amount: paymentResult.amount,
           currency: paymentResult.currency,
-          status: paymentResult.status
+          status: paymentResult.status,
+          sessionID: sessionId || null,
+          accountNumber: accountNumber || null,
+          clientNumber: clientNumber || null
         });
       }
 
@@ -108,7 +116,10 @@ const Payment = () => {
           product,
           accountValue,
           amount,
-          validationData
+          validationData,
+          sessionID: sessionId || null,
+          accountNumber: accountNumber || null,
+          clientNumber: clientNumber || null
         }
       });
     } catch (error) {
