@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import CountryServiceSelection from './pages/CountryServiceSelection';
 import ProviderSelection from './pages/ProviderSelection';
@@ -8,23 +8,25 @@ import Payment from './pages/Payment';
 import Confirmation from './pages/Confirmation';
 import { ROUTES } from './data/constants';
 import { getMode, getUrlParams } from './utils/modeDetection';
-import { iframeBridge } from './utils/iframeBridge';
 import { SessionProvider, useSession } from './context/SessionContext';
 
 const AppShell = () => {
   const { tokenStatus, setTokenData, setTokenStatus } = useSession();
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple initializations
+    if (hasInitialized.current) return;
+    
     const mode = getMode();
     const params = getUrlParams();
-
-    console.log('App initialized in mode:', mode, params);
 
     const validateToken = async (token) => {
       const apiBaseUrl =
         import.meta.env.VITE_TOKEN_API_BASE_URL || 'https://4.222.185.132.nip.io/vas';
       const response = await fetch(
-        `${apiBaseUrl}/api/validate-token?token=${encodeURIComponent(token)}`
+        `${apiBaseUrl}/api/validate-token?token=${encodeURIComponent(token)}`,
+        { cache: 'no-store' }
       );
       if (!response.ok) {
         throw new Error('Invalid token');
@@ -34,28 +36,25 @@ const AppShell = () => {
     };
 
     const init = async () => {
+      // Skip validation if not in iframe mode
       if (mode !== 'iframe') {
         setTokenStatus('valid');
+        return;
+      }
+
+      // Token must be in URL - no fallbacks
+      if (!params.token) {
+        setTokenStatus('invalid');
         return;
       }
 
       setTokenStatus('loading');
 
       try {
-        let token = params.token;
-        if (!token) {
-          const response = await iframeBridge.requestToken();
-          token = response?.token;
-        }
-
-        if (!token) {
-          setTokenStatus('invalid');
-          return;
-        }
-
-        const payload = await validateToken(token);
+        const payload = await validateToken(params.token);
+        hasInitialized.current = true;
         setTokenData({
-          token,
+          token: params.token,
           sessionId: payload?.sessionID || payload?.sessionId || null,
           tokenPayload: payload,
           accountNumber: params.accountNumber || null,
@@ -64,19 +63,10 @@ const AppShell = () => {
         setTokenStatus('valid');
       } catch (error) {
         console.warn('Token validation failed:', error);
+        hasInitialized.current = true;
         setTokenStatus('invalid');
       }
     };
-
-    if (mode === 'iframe') {
-      iframeBridge.on('USER_UPDATE', (data) => {
-        console.log('User info updated:', data);
-      });
-
-      iframeBridge.on('CONFIG_UPDATE', (data) => {
-        console.log('Config updated:', data);
-      });
-    }
 
     init();
   }, [setTokenData, setTokenStatus]);

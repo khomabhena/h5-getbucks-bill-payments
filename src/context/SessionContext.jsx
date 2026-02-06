@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 
 const SessionContext = createContext(null);
 
@@ -10,7 +10,7 @@ export const SessionProvider = ({ children }) => {
   const [clientNumber, setClientNumber] = useState(null);
   const [tokenStatus, setTokenStatus] = useState('idle');
 
-  const setTokenData = ({
+  const setTokenData = useCallback(({
     token: nextToken,
     sessionId: nextSessionId,
     tokenPayload: nextPayload,
@@ -22,7 +22,7 @@ export const SessionProvider = ({ children }) => {
     setTokenPayload(nextPayload || null);
     setAccountNumber(nextAccountNumber || null);
     setClientNumber(nextClientNumber || null);
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -35,7 +35,7 @@ export const SessionProvider = ({ children }) => {
       setTokenData,
       setTokenStatus,
     }),
-    [sessionId, token, tokenPayload, accountNumber, clientNumber, tokenStatus]
+    [sessionId, token, tokenPayload, accountNumber, clientNumber, tokenStatus, setTokenData]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
