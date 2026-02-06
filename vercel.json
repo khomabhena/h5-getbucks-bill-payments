@@ -11,7 +11,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' http://localhost:* https://localhost:* https://tapseed-h5-hub.vercel.app https://*.tapseed.com https://tapseed.com https://*.tapseedhub.com https://tapseedhub.com https://*.vercel.app https://*.nip.io https://4.222.185.132.nip.io; frame-src 'self'"
+          "value": "frame-ancestors *; frame-src 'self'"
         },
         {
           "key": "X-Content-Type-Options",
