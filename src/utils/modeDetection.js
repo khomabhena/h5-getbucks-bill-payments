@@ -37,9 +37,10 @@ export const getUrlParams = () => {
   const params = new URLSearchParams(window.location.search);
   return {
     token: params.get('token'),
+    accountNumber: params.get('accountNumber'),
+    clientNumber: params.get('clientNumber'),
     mode: params.get('mode'),
     returnUrl: params.get('returnUrl'),
-    // Add any other parameters you need
   };
 };
 

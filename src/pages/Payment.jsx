@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button, Header, PageWrapper, Icon, Card } from '../components';
-import { processPayment } from '../services/paymentBridge';
 import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
 import { useSession } from '../context/SessionContext';
@@ -58,7 +57,9 @@ const Payment = () => {
     });
     
     try {
-      // Process payment using appropriate bridge (native/iframe/mock)
+      // Process payment using direct BankWare API
+      const { bankPaymentService } = await import('../services/bankPaymentService');
+      
       const paymentData = {
         amount,
         currency: product?.Currency || product?.currency || 'USD',
@@ -72,7 +73,7 @@ const Payment = () => {
         clientNumber: clientNumber || null
       };
 
-      const paymentResult = await processPayment(paymentData);
+      const paymentResult = await bankPaymentService.processGetBucksPayment(paymentData);
 
       if (!paymentResult.success) {
         throw new Error(paymentResult.message || 'Payment failed');
