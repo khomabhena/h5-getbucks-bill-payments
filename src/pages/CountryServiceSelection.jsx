@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Header, PageWrapper, Icon, Card, SelectionButton } from '../components';
 import { appleTreeService } from '../services/appleTreeService';
 import { getCountryByCode } from '../data/countries';
-import { ROUTES, SERVICES } from '../data/constants';
+import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
 import { getServiceIconName } from '../utils/serviceIcons';
 import Flag from '../components/Flag';
@@ -23,14 +23,10 @@ const CountryServiceSelection = () => {
   const loadServices = useCallback(async (countryCode) => {
     setLoadingServices(true);
     try {
-      const result = await appleTreeService.getServices(countryCode);
-      
+      const result = await appleTreeService.getBillPaymentServicesForCountry(countryCode);
+
       if (result.success) {
-        // Filter out Mobile services (1, 2, 3) - only show bill payment services
-        const billPaymentServices = result.data.filter(
-          service => ![SERVICES.MOBILE_AIRTIME, SERVICES.MOBILE_DATA, SERVICES.MOBILE_BUNDLES].includes(service.Id)
-        );
-        setServices(billPaymentServices);
+        setServices(result.data);
       } else {
         console.error('Failed to load services:', result.error);
         setServices([]);
