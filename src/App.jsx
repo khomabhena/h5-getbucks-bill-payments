@@ -23,7 +23,9 @@ const AppShell = () => {
 
     const validateToken = async (token) => {
       const apiBaseUrl =
-        import.meta.env.VITE_TOKEN_API_BASE_URL || 'https://4.222.185.132.nip.io/vas';
+        import.meta.env.VITE_API_BASE_URL ||
+        import.meta.env.VITE_TOKEN_API_BASE_URL ||
+        'https://4.222.185.132.nip.io/vas';
       const response = await fetch(
         `${apiBaseUrl}/api/validate-token?token=${encodeURIComponent(token)}`,
         { cache: 'no-store' }

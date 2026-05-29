@@ -4,10 +4,11 @@
  */
 
 import { getBucksAuth } from './GetBucksAuth.js';
+import { bankwareUrl } from '../../config/api.js';
 
 class GetBucksAPI {
   constructor() {
-    this.baseUrl = import.meta.env.VITE_GETBUCKS_API_URL || 'http://s-bwopenapi.getbucksbank.com';
+    this.baseUrl = bankwareUrl;
     this.ifsProgramId = import.meta.env.VITE_GETBUCKS_IFS_PROGRAM_ID || '';
   }
 

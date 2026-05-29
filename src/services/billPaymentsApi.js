@@ -1,45 +1,56 @@
 /**
- * Bill Payments API helpers for AppleTree Gateway
- * Provides direct wrappers for payment validation and posting endpoints.
+ * Bill payment validate/post via VAS server.
  */
 
-import AppleTreeGateway from './appletree/AppleTreeGateway';
+import { vasPaymentUrl } from '../config/api.js';
+import { vasJson } from './vas/vasHttp.js';
+import {
+  mapVasPaymentToUiResult,
+  mapVasPaymentErrorToUiResult,
+} from './vas/billPaymentPayload.js';
 
-// Create a dedicated gateway instance for bill payment calls
-const gateway = new AppleTreeGateway();
-
-/**
- * Validate a bill payment payload with AppleTree Gateway.
- *
- * @param {object} paymentData - The payload to validate
- * @returns {Promise<object>} Gateway response
- */
 export const validateBillPayment = async (paymentData) => {
   try {
-    return await gateway.validatePayment(paymentData);
+    const data = await vasJson(`${vasPaymentUrl}/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paymentData),
+    });
+    return {
+      success: data.Status === 'VALIDATED',
+      data,
+      message: data.ResultMessage || 'Validation successful',
+    };
   } catch (error) {
     console.error('Error validating bill payment:', error);
-    throw error;
+    return {
+      success: false,
+      error: error.message,
+      message: error.message,
+      data: error.responseData,
+    };
   }
 };
 
-/**
- * Post a bill payment payload to AppleTree Gateway for fulfillment.
- *
- * @param {object} paymentData - The payload to submit
- * @returns {Promise<object>} Gateway response
- */
 export const postBillPayment = async (paymentData) => {
+  const requestId = paymentData?.RequestId;
   try {
-    return await gateway.postPayment(paymentData);
+    const data = await vasJson(vasPaymentUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paymentData),
+    });
+    console.log('📥 VAS PostPayment response:', data);
+    return mapVasPaymentToUiResult(data, requestId);
   } catch (error) {
     console.error('Error posting bill payment:', error);
-    throw error;
+    throw Object.assign(error, {
+      uiResult: mapVasPaymentErrorToUiResult(error, requestId),
+    });
   }
 };
 
 export default {
   validateBillPayment,
-  postBillPayment
+  postBillPayment,
 };
-

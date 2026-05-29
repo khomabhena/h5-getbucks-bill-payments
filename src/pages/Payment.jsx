@@ -52,14 +52,13 @@ const Payment = () => {
     setError(null);
     setStatusCard({
       title: 'Processing Payment',
-      message: 'Completing payment through GetBucks Bank…',
-      tone: 'info'
+      message: 'Validating bill and processing bank transfer…',
+      tone: 'info',
     });
-    
+
     try {
-      // Process payment using direct BankWare API
       const { bankPaymentService } = await import('../services/bankPaymentService');
-      
+
       const paymentData = {
         amount,
         currency: product?.Currency || product?.currency || 'USD',
@@ -68,9 +67,10 @@ const Payment = () => {
         provider,
         country,
         service,
+        validationData,
         sessionID: sessionId || null,
         accountNumber: accountNumber || null,
-        clientNumber: clientNumber || null
+        clientNumber: clientNumber || null,
       };
 
       const paymentResult = await bankPaymentService.processGetBucksPayment(paymentData);
@@ -79,11 +79,14 @@ const Payment = () => {
         throw new Error(paymentResult.message || 'Payment failed');
       }
 
-      // Payment successful
+      const vasOk = paymentResult.postPaymentResult?.success;
       setStatusCard({
-        title: 'Payment Complete',
-        message: 'Your payment has been processed successfully.',
-        tone: 'success'
+        title: vasOk ? 'Payment Complete' : 'Transfer Complete',
+        message: vasOk
+          ? 'Your bill payment has been processed successfully.'
+          : paymentResult.postPaymentResult?.resultMessage ||
+            'Bank transfer succeeded but bill posting needs attention.',
+        tone: vasOk ? 'success' : 'warning',
       });
 
       // Notify parent if in iframe mode
@@ -117,11 +120,12 @@ const Payment = () => {
           product,
           accountValue,
           amount,
-          validationData,
+          validationData: paymentResult.validationData || validationData,
+          postPaymentResult: paymentResult.postPaymentResult,
           sessionID: sessionId || null,
           accountNumber: accountNumber || null,
-          clientNumber: clientNumber || null
-        }
+          clientNumber: clientNumber || null,
+        },
       });
     } catch (error) {
       console.error('Payment error:', error);

@@ -1,9 +1,13 @@
 /**
- * GetBucks Bank Payment Service
- * Direct BankWare integration for Bill Payments
+ * Bill payment: BankWare transfer (VAS proxy) then VAS PostPayment fulfillment.
  */
 
 import { getBucksAPI } from './getbucks';
+import {
+  buildPostPaymentPayload,
+  buildValidatePaymentPayload,
+  mapVasPaymentErrorToUiResult,
+} from './vas/billPaymentPayload.js';
 
 class BankPaymentService {
   constructor() {
@@ -64,6 +68,90 @@ class BankPaymentService {
     return `BP-${timestamp}-${random}`;
   }
 
+  async resolveCustomerDetails(paymentData) {
+    if (paymentData.validationData?.CustomerDetails) {
+      return paymentData.validationData.CustomerDetails;
+    }
+    if (paymentData.customerDetails) {
+      return paymentData.customerDetails;
+    }
+
+    try {
+      const { getUserInfo } = await import('./paymentBridge');
+      const userInfo = await getUserInfo();
+      if (userInfo) {
+        return {
+          CustomerId: userInfo.CustomerId || userInfo.id || userInfo.userId || '1',
+          Fullname: userInfo.Fullname || userInfo.name || userInfo.fullName || 'Customer',
+          MobileNumber:
+            userInfo.MobileNumber || userInfo.phoneNumber || userInfo.msisdn || '+263777077921',
+          EmailAddress: userInfo.EmailAddress || userInfo.email || null,
+        };
+      }
+    } catch (error) {
+      console.warn('Could not get user info from bridge:', error);
+    }
+
+    return {
+      CustomerId: '1',
+      Fullname: 'Customer',
+      MobileNumber: '+263777077921',
+      EmailAddress: null,
+    };
+  }
+
+  async ensureBillValidated(paymentData) {
+    const { validateBillPayment } = await import('./billPaymentsApi.js');
+    const customerDetails = await this.resolveCustomerDetails(paymentData);
+    const currency = paymentData.currency || this.defaultCurrency;
+
+    const payload = buildValidatePaymentPayload({
+      product: paymentData.product,
+      amount: paymentData.amount,
+      currency,
+      accountValue: paymentData.accountValue,
+      customerDetails,
+      billReferenceNumber: 'pre-transfer-validate',
+    });
+
+    const result = await validateBillPayment(payload);
+    if (!result.success || result.data?.Status !== 'VALIDATED') {
+      throw new Error(
+        result.data?.ResultMessage ||
+          result.message ||
+          'Bill account could not be validated. Please check your details.'
+      );
+    }
+
+    return result.data;
+  }
+
+  async postBillPaymentToVas(paymentData, bankReference) {
+    const { postBillPayment } = await import('./billPaymentsApi.js');
+    const customerDetails = await this.resolveCustomerDetails(paymentData);
+    const currency = paymentData.currency || this.defaultCurrency;
+
+    const payload = buildPostPaymentPayload({
+      product: paymentData.product,
+      amount: paymentData.amount,
+      currency,
+      accountValue: paymentData.accountValue,
+      customerDetails,
+      bankReference,
+    });
+
+    console.log('📤 VAS PostPayment (bill):', payload);
+
+    try {
+      return await postBillPayment(payload);
+    } catch (error) {
+      if (error.uiResult) {
+        return error.uiResult;
+      }
+      return mapVasPaymentErrorToUiResult(error, payload.RequestId);
+    }
+  }
+
   /**
    * Process payment through GetBucks Bank
    * Creates an account transfer from customer to merchant account
@@ -85,8 +173,17 @@ class BankPaymentService {
         throw new Error('Amount is required');
       }
 
+      if (!paymentData.product || !paymentData.accountValue) {
+        throw new Error('Product and account details are required');
+      }
+
       if (!this.merchantAccount) {
         throw new Error('Merchant account not configured. Please set VITE_GETBUCKS_MERCHANT_ACCOUNT');
+      }
+
+      let validationData = paymentData.validationData;
+      if (!validationData || validationData.Status !== 'VALIDATED') {
+        validationData = await this.ensureBillValidated(paymentData);
       }
 
       // Get customer account and client number (prefer values from session/context)
@@ -138,21 +235,46 @@ class BankPaymentService {
         transferData.debitNarrative4 = accountValue;
       }
 
-      // Create account transfer
       const transferResult = await getBucksAPI.createAccountTransfer(transferData);
 
-      // Map GetBucks response to our payment result format
+      if (!transferResult.success) {
+        throw new Error(transferResult.message || 'Bank transfer failed');
+      }
+
+      const bankRef =
+        transferResult.externalReference || reference || transferResult.bankwareReference;
+
+      let postPaymentResult = null;
+      try {
+        postPaymentResult = await this.postBillPaymentToVas(
+          { ...paymentData, validationData },
+          bankRef
+        );
+      } catch (vasError) {
+        console.warn('⚠️ VAS PostPayment failed after bank transfer:', vasError);
+        postPaymentResult = mapVasPaymentErrorToUiResult(vasError, null);
+      }
+
+      const bankOk =
+        transferResult.statusCode === 201 ||
+        transferResult.statusCode === 202 ||
+        transferResult.success;
+
       return {
-        success: transferResult.success,
-        transactionId: transferResult.externalReference,
-        reference: reference,
+        success: bankOk,
+        transactionId: transferResult.externalReference || reference,
+        reference,
         bankwareReference: transferResult.bankwareReference,
         status: transferResult.status === 'created' ? 'SUCCESS' : transferResult.status,
         statusCode: transferResult.statusCode,
-        message: 'Payment processed successfully',
+        message: postPaymentResult?.success
+          ? 'Payment and bill fulfillment completed'
+          : 'Bank payment recorded; bill fulfillment pending or failed',
         timestamp: new Date().toISOString(),
         amount: paymentData.amount,
-        currency: currency
+        currency,
+        validationData,
+        postPaymentResult,
       };
     } catch (error) {
       console.error('❌ Payment processing failed:', error);
