@@ -9,6 +9,7 @@ import Confirmation from './pages/Confirmation';
 import { ROUTES } from './data/constants';
 import { getMode, getUrlParams } from './utils/modeDetection';
 import { SessionProvider, useSession } from './context/SessionContext';
+import { fetchAccountCurrency } from './services/accountService';
 
 const AppShell = () => {
   const { tokenStatus, setTokenData, setTokenStatus } = useSession();
@@ -54,13 +55,20 @@ const AppShell = () => {
 
       try {
         const payload = await validateToken(params.token);
+        const accountNumber = params.accountNumber || null;
+        const currencyResult = accountNumber
+          ? await fetchAccountCurrency(accountNumber)
+          : null;
+
         hasInitialized.current = true;
         setTokenData({
           token: params.token,
           sessionId: payload?.sessionID || payload?.sessionId || null,
           tokenPayload: payload,
-          accountNumber: params.accountNumber || null,
+          accountNumber,
           clientNumber: params.clientNumber || null,
+          accountCurrency: currencyResult?.vasCurrency || 'USD',
+          currencyCode: currencyResult?.currencyCode || 'USD',
         });
         setTokenStatus('valid');
       } catch (error) {

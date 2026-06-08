@@ -7,11 +7,13 @@ import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
 import { getServiceIconName } from '../utils/serviceIcons';
 import { getDisplayIdentifierLabel } from '../utils/identifierLabel';
+import { useSession } from '../context/SessionContext';
 
 const ProductSelection = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { country, service, provider } = location.state || {};
+  const { accountCurrency } = useSession();
 
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -30,7 +32,7 @@ const ProductSelection = () => {
     if (country && service && provider) {
       loadProducts();
     }
-  }, [country, service, provider]);
+  }, [country, service, provider, accountCurrency]);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -39,7 +41,8 @@ const ProductSelection = () => {
       const result = await appleTreeService.getProducts({
         countryCode: country.countryCode,
         serviceId: service.Id,
-        serviceProviderId: provider.Id || provider.id
+        serviceProviderId: provider.Id || provider.id,
+        currency: accountCurrency || 'USD',
       });
 
       if (result.success) {

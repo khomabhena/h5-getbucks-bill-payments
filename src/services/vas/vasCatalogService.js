@@ -142,6 +142,7 @@ class VasCatalogService {
       const query = {
         countryCode: filters.countryCode,
         service: filters.serviceId,
+        currency: filters.currency || 'USD',
       };
       if (filters.serviceProviderId) {
         query.serviceProviderId = filters.serviceProviderId;

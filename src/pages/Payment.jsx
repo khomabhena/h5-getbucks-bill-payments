@@ -21,7 +21,7 @@ const Payment = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [statusCard, setStatusCard] = useState(null);
-  const { sessionId, accountNumber, clientNumber } = useSession();
+  const { sessionId, accountNumber, clientNumber, accountCurrency } = useSession();
 
   // Redirect if no required data
   useEffect(() => {
@@ -61,7 +61,7 @@ const Payment = () => {
 
       const paymentData = {
         amount,
-        currency: product?.Currency || product?.currency || 'USD',
+        currency: product?.Currency || product?.currency || accountCurrency || 'USD',
         accountValue,
         product,
         provider,
@@ -168,7 +168,7 @@ const Payment = () => {
     return null;
   }
 
-  const currency = product?.Currency || product?.currency || 'USD';
+  const currency = product?.Currency || product?.currency || accountCurrency || 'USD';
   const accountName = getAccountName();
 
   const getStatusCardStyle = () => {

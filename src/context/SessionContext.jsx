@@ -8,6 +8,8 @@ export const SessionProvider = ({ children }) => {
   const [tokenPayload, setTokenPayload] = useState(null);
   const [accountNumber, setAccountNumber] = useState(null);
   const [clientNumber, setClientNumber] = useState(null);
+  const [accountCurrency, setAccountCurrency] = useState('USD');
+  const [currencyCode, setCurrencyCode] = useState('USD');
   const [tokenStatus, setTokenStatus] = useState('idle');
 
   const setTokenData = useCallback(({
@@ -16,12 +18,16 @@ export const SessionProvider = ({ children }) => {
     tokenPayload: nextPayload,
     accountNumber: nextAccountNumber,
     clientNumber: nextClientNumber,
+    accountCurrency: nextAccountCurrency,
+    currencyCode: nextCurrencyCode,
   }) => {
     setToken(nextToken || null);
     setSessionId(nextSessionId || null);
     setTokenPayload(nextPayload || null);
     setAccountNumber(nextAccountNumber || null);
     setClientNumber(nextClientNumber || null);
+    if (nextAccountCurrency) setAccountCurrency(nextAccountCurrency);
+    if (nextCurrencyCode) setCurrencyCode(nextCurrencyCode);
   }, []);
 
   const value = useMemo(
@@ -31,11 +37,24 @@ export const SessionProvider = ({ children }) => {
       tokenPayload,
       accountNumber,
       clientNumber,
+      accountCurrency,
+      currencyCode,
       tokenStatus,
       setTokenData,
       setTokenStatus,
+      setAccountCurrency,
     }),
-    [sessionId, token, tokenPayload, accountNumber, clientNumber, tokenStatus, setTokenData]
+    [
+      sessionId,
+      token,
+      tokenPayload,
+      accountNumber,
+      clientNumber,
+      accountCurrency,
+      currencyCode,
+      tokenStatus,
+      setTokenData,
+    ]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
