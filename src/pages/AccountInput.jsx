@@ -9,6 +9,19 @@ import { getDisplayIdentifierLabel, getMinIdentifierLength } from '../utils/iden
 import { resolveCustomerDetailsForVas } from '../services/vas/billPaymentPayload.js';
 import { getServiceIconName } from '../utils/serviceIcons';
 
+/** Bill amount from VAS, or payment field for variable-amount products. */
+function resolveDisplayBillAmount(validationData, amount, isFixedAmount) {
+  if (!validationData || validationData.Status !== 'VALIDATED') return null;
+
+  const apiAmount = validationData.BillAmount;
+  const entered = parseFloat(amount);
+
+  if (apiAmount != null && apiAmount > 0) return apiAmount;
+  if (!isFixedAmount && !isNaN(entered) && entered > 0) return entered;
+  if (apiAmount != null) return apiAmount;
+  return null;
+}
+
 const AccountInput = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -84,7 +97,7 @@ const AccountInput = () => {
     return resolveCustomerDetailsForVas();
   };
 
-  // Use refs to get current values without triggering re-validation on amount change
+  // Refs for validation payload (account + amount)
   const amountRef = useRef(amount);
   const accountValueRef = useRef(accountValue);
   
@@ -218,7 +231,7 @@ const AccountInput = () => {
     }
   }, [validating, accountValue.length]);
 
-  // Debounced validation — only after minimum length and user stops typing
+  // Debounced validation when account or payment amount changes
   useEffect(() => {
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current);
@@ -242,11 +255,12 @@ const AccountInput = () => {
         clearTimeout(validationTimeoutRef.current);
       }
     };
-  }, [accountValue, performValidation, minAccountLength]);
+  }, [accountValue, amount, performValidation, minAccountLength]);
 
   const handleContinue = () => {
     const amountValue = parseFloat(amount);
-    
+    const billAmount = resolveDisplayBillAmount(validationData, amount, isFixedAmount);
+
     if (product && country && service && provider) {
       navigate(ROUTES.PAYMENT, {
         state: {
@@ -256,7 +270,9 @@ const AccountInput = () => {
           product,
           accountValue,
           amount: amountValue,
-          validationData
+          validationData: validationData
+            ? { ...validationData, BillAmount: billAmount ?? validationData.BillAmount }
+            : null,
         },
       });
     }
@@ -272,6 +288,7 @@ const AccountInput = () => {
   const hasValidAccount = trimmedAccount.length > 0;
   const isAccountCompleteEnough = trimmedAccount.length >= minAccountLength;
   const isValidationSuccessful = validationData && validationData.Status === 'VALIDATED';
+  const displayBillAmount = resolveDisplayBillAmount(validationData, amount, isFixedAmount);
   const hasValidationFailed =
     isAccountCompleteEnough && !validating && !isValidationSuccessful && validationError;
   const canContinue = hasValidAccount && hasValidAmount;
@@ -357,13 +374,13 @@ const AccountInput = () => {
                 })}
               </div>
 
-              {/* Bill Amount Display (if available) */}
-              {validationData.BillAmount !== undefined && validationData.BillAmount !== null && (
+              {/* Bill Amount — VAS response or payment amount for variable products */}
+              {displayBillAmount !== null && (
                 <div className="mt-3 pt-3 border-t border-green-200">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-medium text-gray-600">Bill Amount:</span>
                     <span className="text-sm font-semibold text-green-700">
-                      {currency} {validationData.BillAmount.toFixed(2)}
+                      {currency} {displayBillAmount.toFixed(2)}
                     </span>
                   </div>
                 </div>
