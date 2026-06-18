@@ -130,7 +130,7 @@ export const getUserInfo = async () => {
         CustomerId: '1',
         Fullname: 'Test User',
         MobileNumber: '+263777077921',
-        EmailAddress: 'test@example.com'
+        EmailAddress: 'test@test.com'
       };
   }
 };

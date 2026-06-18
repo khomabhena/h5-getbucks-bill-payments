@@ -10,9 +10,22 @@ export function generateRequestId() {
   });
 }
 
+export const DEFAULT_CUSTOMER_EMAIL = 'test@test.com';
+
 export function getCreditPartyFieldName(product) {
   const creditPartyIdentifier = product?.CreditPartyIdentifiers?.[0];
   return creditPartyIdentifier?.Name || 'AccountNumber';
+}
+
+/** VAS requires CustomerDetails.EmailAddress — never send null. */
+export function resolveCustomerDetailsForVas(details = {}) {
+  return {
+    CustomerId: details.CustomerId || details.id || details.userId || '1',
+    Fullname: details.Fullname || details.name || details.fullName || 'Customer',
+    MobileNumber:
+      details.MobileNumber || details.phoneNumber || details.msisdn || '+263777077921',
+    EmailAddress: DEFAULT_CUSTOMER_EMAIL,
+  };
 }
 
 /**
@@ -46,7 +59,7 @@ export function buildValidatePaymentPayload({
       },
     ],
     Currency: currency || 'USD',
-    CustomerDetails: customerDetails,
+    CustomerDetails: resolveCustomerDetailsForVas(customerDetails),
     POSDetails: {
       CashierId: 'GetBucks',
       StoreId: 'GetBucks',
@@ -82,7 +95,7 @@ export function buildPostPaymentPayload({
     PaymentChannel: 'BankAccount',
     PaymentReferenceNumber: ref,
     BillReferenceNumber: ref,
-    CustomerDetails: customerDetails,
+    CustomerDetails: resolveCustomerDetailsForVas(customerDetails),
     POSDetails: {
       CashierId: 'GetBucks',
       StoreId: 'GetBucks',

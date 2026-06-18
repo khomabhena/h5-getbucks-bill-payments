@@ -6,6 +6,7 @@ import AppleTreeGateway from '../services/appletree/AppleTreeGateway';
 import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
 import { getDisplayIdentifierLabel, getMinIdentifierLength } from '../utils/identifierLabel';
+import { resolveCustomerDetailsForVas } from '../services/vas/billPaymentPayload.js';
 import { getServiceIconName } from '../utils/serviceIcons';
 
 const AccountInput = () => {
@@ -74,24 +75,13 @@ const AccountInput = () => {
       const userInfo = await getUserInfo();
       
       if (userInfo) {
-        return {
-          CustomerId: userInfo.CustomerId || userInfo.id || userInfo.userId || '1',
-          Fullname: userInfo.Fullname || userInfo.name || userInfo.fullName || 'Customer',
-          MobileNumber: userInfo.MobileNumber || userInfo.phoneNumber || userInfo.msisdn || '+263777077921',
-          EmailAddress: userInfo.EmailAddress || userInfo.email || null
-        };
+        return resolveCustomerDetailsForVas(userInfo);
       }
     } catch (error) {
       console.warn('Could not get user info from bridge:', error);
     }
-    
-    // Fallback to default
-    return {
-      CustomerId: '1',
-      Fullname: 'Customer',
-      MobileNumber: '+263777077921',
-      EmailAddress: null
-    };
+
+    return resolveCustomerDetailsForVas();
   };
 
   // Use refs to get current values without triggering re-validation on amount change

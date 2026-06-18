@@ -7,6 +7,7 @@ import {
   buildPostPaymentPayload,
   buildValidatePaymentPayload,
   mapVasPaymentErrorToUiResult,
+  resolveCustomerDetailsForVas,
 } from './vas/billPaymentPayload.js';
 
 class BankPaymentService {
@@ -70,34 +71,23 @@ class BankPaymentService {
 
   async resolveCustomerDetails(paymentData) {
     if (paymentData.validationData?.CustomerDetails) {
-      return paymentData.validationData.CustomerDetails;
+      return resolveCustomerDetailsForVas(paymentData.validationData.CustomerDetails);
     }
     if (paymentData.customerDetails) {
-      return paymentData.customerDetails;
+      return resolveCustomerDetailsForVas(paymentData.customerDetails);
     }
 
     try {
       const { getUserInfo } = await import('./paymentBridge');
       const userInfo = await getUserInfo();
       if (userInfo) {
-        return {
-          CustomerId: userInfo.CustomerId || userInfo.id || userInfo.userId || '1',
-          Fullname: userInfo.Fullname || userInfo.name || userInfo.fullName || 'Customer',
-          MobileNumber:
-            userInfo.MobileNumber || userInfo.phoneNumber || userInfo.msisdn || '+263777077921',
-          EmailAddress: userInfo.EmailAddress || userInfo.email || null,
-        };
+        return resolveCustomerDetailsForVas(userInfo);
       }
     } catch (error) {
       console.warn('Could not get user info from bridge:', error);
     }
 
-    return {
-      CustomerId: '1',
-      Fullname: 'Customer',
-      MobileNumber: '+263777077921',
-      EmailAddress: null,
-    };
+    return resolveCustomerDetailsForVas();
   }
 
   async ensureBillValidated(paymentData) {
