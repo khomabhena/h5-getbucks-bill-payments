@@ -89,3 +89,23 @@ export const getDisplayIdentifierLabel = (fieldName, context = {}) => {
     .trim();
 };
 
+/**
+ * Minimum characters before calling VAS validate (avoids errors while typing).
+ */
+export const getMinIdentifierLength = (fieldLabel, fieldName) => {
+  const label = (fieldLabel || '').toLowerCase();
+  const name = (fieldName || '').toLowerCase();
+
+  if (label.includes('meter') || name.includes('meter')) return 10;
+  if (label.includes('smart card') || name.includes('smartcard')) return 10;
+  if (
+    label.includes('mobile') ||
+    label.includes('phone') ||
+    name.includes('mobile') ||
+    name.includes('phone')
+  ) {
+    return 9;
+  }
+  return 8;
+};
+

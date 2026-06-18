@@ -5,7 +5,7 @@ import { appleTreeService } from '../services/appleTreeService';
 import AppleTreeGateway from '../services/appletree/AppleTreeGateway';
 import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
-import { getDisplayIdentifierLabel } from '../utils/identifierLabel';
+import { getDisplayIdentifierLabel, getMinIdentifierLength } from '../utils/identifierLabel';
 import { getServiceIconName } from '../utils/serviceIcons';
 
 const AccountInput = () => {
@@ -65,6 +65,7 @@ const AccountInput = () => {
     }
   );
   const fieldName = creditPartyIdentifier?.Name || 'AccountNumber';
+  const minAccountLength = getMinIdentifierLength(fieldLabel, fieldName);
 
   // Get customer details from bridge (native/iframe/mock)
   const getCustomerDetails = async () => {
@@ -110,6 +111,10 @@ const AccountInput = () => {
     const currentAmount = amountRef.current;
     
     if (!currentAccountValue.trim() || !product) {
+      return;
+    }
+
+    if (currentAccountValue.trim().length < minAccountLength) {
       return;
     }
 
@@ -176,7 +181,7 @@ const AccountInput = () => {
         setValidating(false);
       }
     }
-  }, [product, fieldName, currency]);
+  }, [product, fieldName, currency, minAccountLength]);
 
   // Track if input was focused before validation
   const wasFocusedRef = useRef(false);
@@ -193,9 +198,16 @@ const AccountInput = () => {
   };
   
   const handleAccountInputBlur = () => {
-    // Only mark as not focused if user clicked outside (not during validation)
     if (!validatingRef.current) {
       wasFocusedRef.current = false;
+    }
+
+    const trimmed = accountValueRef.current.trim();
+    if (trimmed.length >= minAccountLength) {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+      performValidation();
     }
   };
 
@@ -216,20 +228,23 @@ const AccountInput = () => {
     }
   }, [validating, accountValue.length]);
 
-  // Debounced validation - trigger 1 second after user stops typing
+  // Debounced validation — only after minimum length and user stops typing
   useEffect(() => {
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current);
     }
 
-    if (accountValue.trim().length > 0) {
+    const trimmedLength = accountValue.trim().length;
+
+    if (trimmedLength >= minAccountLength) {
       validationTimeoutRef.current = setTimeout(() => {
         performValidation();
-      }, 1000);
+      }, 1500);
     } else {
       setValidationData(null);
       setValidationError(null);
       setValidating(false);
+      currentValidationRequestRef.current = null;
     }
 
     return () => {
@@ -237,7 +252,7 @@ const AccountInput = () => {
         clearTimeout(validationTimeoutRef.current);
       }
     };
-  }, [accountValue, performValidation]);
+  }, [accountValue, performValidation, minAccountLength]);
 
   const handleContinue = () => {
     const amountValue = parseFloat(amount);
@@ -263,9 +278,12 @@ const AccountInput = () => {
 
   const amountValue = parseFloat(amount);
   const hasValidAmount = amount && !isNaN(amountValue) && amountValue > 0;
-  const hasValidAccount = accountValue.trim().length > 0;
+  const trimmedAccount = accountValue.trim();
+  const hasValidAccount = trimmedAccount.length > 0;
+  const isAccountCompleteEnough = trimmedAccount.length >= minAccountLength;
   const isValidationSuccessful = validationData && validationData.Status === 'VALIDATED';
-  const hasValidationFailed = !validating && !isValidationSuccessful && validationError;
+  const hasValidationFailed =
+    isAccountCompleteEnough && !validating && !isValidationSuccessful && validationError;
   const canContinue = hasValidAccount && hasValidAmount;
 
   return (
@@ -313,7 +331,7 @@ const AccountInput = () => {
               }}
               onFocus={handleAccountInputFocus}
               onBlur={handleAccountInputBlur}
-              error={validationError && !validating ? validationError : null}
+              error={hasValidationFailed ? validationError : null}
               loading={validating}
               required
             />
