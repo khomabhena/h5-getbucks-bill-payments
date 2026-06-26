@@ -11,6 +11,7 @@ const ProductCard = ({
   product, 
   selected = false, 
   onClick,
+  isCategory = false,
   service,
   provider,
   className = ''
@@ -27,6 +28,30 @@ const ProductCard = ({
     BalanceAvailable: balanceAvailable,
     Reversible: reversible
   } = product;
+
+  if (isCategory) {
+    return (
+      <button
+        onClick={onClick}
+        className={`
+          w-full text-left transition-all duration-200
+          bg-white border rounded-lg border-gray-200 hover:border-gray-300 hover:shadow-md
+          ${className}
+        `}
+      >
+        <div className="flex items-center justify-between p-4 gap-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900 line-clamp-2">{name || 'Category'}</h3>
+            {description && (
+              <p className="text-xs text-gray-600 mt-1 line-clamp-2">{description}</p>
+            )}
+            <p className="text-xs text-gray-500 mt-2">Tap to view products</p>
+          </div>
+          <Icon name="chevron_right" size={24} className="text-gray-400 flex-shrink-0" />
+        </div>
+      </button>
+    );
+  }
 
   const displayCurrency = (currency || 'USD').toUpperCase();
   const hasAmountLimits = minAmount > 0 || maxAmount > 0;

@@ -135,17 +135,26 @@ class VasCatalogService {
   async getProducts(filters, useCache = true) {
     void useCache;
     try {
-      if (!filters.countryCode || !filters.serviceId) {
-        throw new Error('countryCode and serviceId are required');
-      }
+      let query;
 
-      const query = {
-        countryCode: filters.countryCode,
-        service: filters.serviceId,
-        currency: filters.currency || 'USD',
-      };
-      if (filters.serviceProviderId) {
-        query.serviceProviderId = filters.serviceProviderId;
+      if (filters.parentProduct) {
+        query = {
+          parentProduct: filters.parentProduct,
+          currency: filters.currency || 'USD',
+        };
+      } else {
+        if (!filters.countryCode || !filters.serviceId) {
+          throw new Error('countryCode and serviceId are required');
+        }
+
+        query = {
+          countryCode: filters.countryCode,
+          service: filters.serviceId,
+          currency: filters.currency || 'USD',
+        };
+        if (filters.serviceProviderId) {
+          query.serviceProviderId = filters.serviceProviderId;
+        }
       }
 
       const data = await vasJson(catalogUrl('/products', query));

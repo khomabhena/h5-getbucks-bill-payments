@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button, Header, PageWrapper, Icon, Card } from '../components';
 import ProductCard from '../components/ProductCard';
@@ -15,77 +15,110 @@ const ProductSelection = () => {
   const { country, service, provider } = location.state || {};
   const { accountCurrency } = useSession();
 
+  const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [categoryStack, setCategoryStack] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Redirect if no country/service/provider selected
+  const currentParentProduct =
+    categoryStack.length > 0 ? categoryStack[categoryStack.length - 1].id : null;
+
   useEffect(() => {
     if (!country || !service || !provider) {
       navigate(ROUTES.PROVIDERS, { replace: true });
     }
   }, [country, service, provider, navigate]);
 
-  // Load products when component mounts
+  const loadProducts = useCallback(async () => {
+    if (!country || !service || !provider) return;
+
+    setLoading(true);
+    setError(null);
+    setSelectedProduct(null);
+
+    try {
+      const currency = accountCurrency || 'USD';
+      const filters = currentParentProduct
+        ? { parentProduct: currentParentProduct, currency }
+        : {
+            countryCode: country.countryCode,
+            serviceId: service.Id,
+            serviceProviderId: provider.Id || provider.id,
+            currency,
+          };
+
+      const result = await appleTreeService.getProducts(filters);
+
+      if (!result.success) {
+        setError(result.error || 'Failed to load products');
+        setCategories([]);
+        setProducts([]);
+        return;
+      }
+
+      const allProducts = result.data || [];
+      let scopedProducts = allProducts;
+
+      if (!currentParentProduct) {
+        scopedProducts = allProducts.filter((product) => {
+          if (product.IsCategory === true) return true;
+          const productProviderId =
+            product.ServiceProvider?.Id ||
+            product.ServiceProviderId ||
+            product.serviceProviderId;
+          const expectedProviderId = provider.Id || provider.id;
+          return productProviderId === expectedProviderId;
+        });
+      }
+
+      const categoryRows = scopedProducts.filter((product) => product.IsCategory === true);
+      const leafProducts = scopedProducts.filter((product) => product.IsCategory !== true);
+
+      setCategories(categoryRows);
+      setProducts(leafProducts);
+
+      if (leafProducts.length === 1) {
+        setSelectedProduct(leafProducts[0]);
+      }
+    } catch (err) {
+      console.error('Error loading products:', err);
+      const isNetworkError =
+        err.message?.includes('Failed to fetch') ||
+        err.message?.includes('NetworkError') ||
+        err.name === 'TypeError';
+
+      setError(
+        isNetworkError
+          ? 'Network connection issue. Please check your internet connection and try again.'
+          : err.message || 'Failed to load products. Please try again.'
+      );
+      setCategories([]);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [country, service, provider, accountCurrency, currentParentProduct]);
+
   useEffect(() => {
     if (country && service && provider) {
       loadProducts();
     }
-  }, [country, service, provider, accountCurrency]);
+  }, [country, service, provider, loadProducts]);
 
-  const loadProducts = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await appleTreeService.getProducts({
-        countryCode: country.countryCode,
-        serviceId: service.Id,
-        serviceProviderId: provider.Id || provider.id,
-        currency: accountCurrency || 'USD',
-      });
+  const handleCategoryOpen = (category) => {
+    setCategoryStack((prev) => [
+      ...prev,
+      { id: category.Id || category.id, name: category.Name || category.name },
+    ]);
+  };
 
-      if (result.success) {
-        // Filter products by selected provider (client-side filtering as backup)
-        const allProducts = result.data || [];
-        const filteredProducts = allProducts.filter(product => {
-          // Match by ServiceProvider ID
-          const productProviderId = product.ServiceProvider?.Id || 
-                                   product.ServiceProviderId || 
-                                   product.serviceProviderId;
-          const expectedProviderId = provider.Id || provider.id;
-          
-          return productProviderId === expectedProviderId;
-        });
-        
-        console.log(`Loaded ${filteredProducts.length} products for ${provider.Name || provider.name} (from ${allProducts.length} total)`);
-        setProducts(filteredProducts);
-        
-        // If only one product, auto-select it
-        if (filteredProducts.length === 1) {
-          setSelectedProduct(filteredProducts[0]);
-        }
-      } else {
-        setError(result.error || 'Failed to load products');
-        setProducts([]);
-      }
-    } catch (error) {
-      console.error('Error loading products:', error);
-      
-      // Check if it's a network error
-      const isNetworkError = error.message?.includes('Failed to fetch') || 
-                            error.message?.includes('NetworkError') ||
-                            error.name === 'TypeError';
-      
-      if (isNetworkError) {
-        setError('Network connection issue. Please check your internet connection and try again.');
-      } else {
-        setError(error.message || 'Failed to load products. Please try again.');
-      }
-      
-      setProducts([]);
-    } finally {
-      setLoading(false);
+  const handleHeaderBack = () => {
+    if (categoryStack.length > 0) {
+      setCategoryStack((prev) => prev.slice(0, -1));
+    } else {
+      navigate(-1);
     }
   };
 
@@ -94,7 +127,7 @@ const ProductSelection = () => {
   };
 
   const handleContinue = () => {
-    if (selectedProduct && country && service && provider) {
+    if (selectedProduct && !selectedProduct.IsCategory && country && service && provider) {
       navigate(ROUTES.ACCOUNT, {
         state: {
           country,
@@ -106,35 +139,37 @@ const ProductSelection = () => {
     }
   };
 
-  const canContinue = selectedProduct && country && service && provider;
+  const canContinue =
+    selectedProduct && !selectedProduct.IsCategory && country && service && provider;
 
-  // Get identifier label for next step
   const creditPartyIdentifier = selectedProduct?.CreditPartyIdentifiers?.[0];
   const identifierLabel = getDisplayIdentifierLabel(
     creditPartyIdentifier?.Name || creditPartyIdentifier?.Title,
     {
       serviceName: service?.Name,
       providerName: provider?.Name || provider?.name,
-      productName: selectedProduct?.Name
+      productName: selectedProduct?.Name,
     }
   );
+
+  const headerTitle =
+    categoryStack.length > 0
+      ? categoryStack[categoryStack.length - 1].name
+      : 'Select Product';
 
   return (
     <PageWrapper>
       <div className="flex flex-col min-h-screen">
-        {/* Header */}
-        <Header title="Select Product" showBackButton={true} />
+        <Header title={headerTitle} showBackButton={true} onBack={handleHeaderBack} />
 
-        {/* Main Content - Scrollable */}
         <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto border-x border-gray-200">
-          {/* Provider Info */}
           <div className="mb-6">
             <Card>
               <div className="flex items-center space-x-3">
                 <div className="flex-shrink-0">
-                  <Icon 
-                    name={getServiceIconName(provider?.Name || provider?.name)} 
-                    size={32} 
+                  <Icon
+                    name={getServiceIconName(provider?.Name || provider?.name)}
+                    size={32}
                     className="text-[#faa819]"
                   />
                 </div>
@@ -150,12 +185,11 @@ const ProductSelection = () => {
             </Card>
           </div>
 
-          {/* Products Section */}
           <Card className="mb-6">
             <h2 className="text-base font-semibold text-gray-900 mb-4">
-              Available Products
+              {currentParentProduct ? 'Products' : 'Available Products'}
             </h2>
-            
+
             {loading ? (
               <div className="text-center py-8">
                 <Icon name="refresh" size={32} className="text-[#faa819] animate-spin mx-auto mb-2" />
@@ -165,25 +199,32 @@ const ProductSelection = () => {
               <div className="text-center py-8">
                 <Icon name="error" size={32} className="text-red-500 mx-auto mb-2" />
                 <p className="text-red-600 text-sm mb-2">{error}</p>
-                <Button
-                  onClick={loadProducts}
-                  variant="outline"
-                  size="sm"
-                >
+                <Button onClick={loadProducts} variant="outline" size="sm">
                   Retry
                 </Button>
               </div>
-            ) : products.length === 0 ? (
+            ) : categories.length === 0 && products.length === 0 ? (
               <div className="text-center py-8 text-gray-500 text-sm">
                 No products available for this provider
               </div>
             ) : (
               <div className="space-y-6 mt-2">
+                {categories.map((category) => (
+                  <ProductCard
+                    key={category.Id || category.id}
+                    product={category}
+                    isCategory={true}
+                    onClick={() => handleCategoryOpen(category)}
+                    service={service}
+                    provider={provider}
+                  />
+                ))}
                 {products.map((product) => {
                   const productId = product.Id || product.id;
                   const selectedId = selectedProduct?.Id || selectedProduct?.id;
-                  const isSelected = selectedProduct && selectedId && selectedId === productId;
-                  
+                  const isSelected =
+                    selectedProduct && selectedId && selectedId === productId;
+
                   return (
                     <ProductCard
                       key={productId}
@@ -199,15 +240,12 @@ const ProductSelection = () => {
             )}
           </Card>
 
-          {/* Next Step Info */}
-          {selectedProduct && (
+          {selectedProduct && !selectedProduct.IsCategory && (
             <Card className="mb-6">
               <div className="flex items-start space-x-2">
                 <Icon name="info" size={20} className="text-[#faa819] flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-medium text-gray-700 mb-1">
-                    Next Step
-                  </p>
+                  <p className="text-xs font-medium text-gray-700 mb-1">Next Step</p>
                   <p className="text-xs text-gray-600">
                     You'll need to enter your {identifierLabel.toLowerCase()} to continue
                   </p>
@@ -216,15 +254,13 @@ const ProductSelection = () => {
             </Card>
           )}
 
-          {/* Info Text */}
           <p className="text-xs text-center text-gray-500 mb-4">
             Select the product you want to purchase
           </p>
         </div>
 
-        {/* Fixed Button at Bottom */}
-        <div 
-          style={{ backgroundColor: colors.background.secondary }} 
+        <div
+          style={{ backgroundColor: colors.background.secondary }}
           className="fixed bottom-0 left-0 right-0 bg-white pb-6 z-40"
         >
           <div className="max-w-md mx-auto px-4 pt-4">
@@ -245,4 +281,3 @@ const ProductSelection = () => {
 };
 
 export default ProductSelection;
-
