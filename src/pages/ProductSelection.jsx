@@ -8,6 +8,7 @@ import { colors } from '../data/colors';
 import { getServiceIconName } from '../utils/serviceIcons';
 import { getDisplayIdentifierLabel } from '../utils/identifierLabel';
 import { useSession } from '../context/SessionContext';
+import { getDefaultCheckoutCurrency } from '../config/catalogCurrency';
 
 const ProductSelection = () => {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ const ProductSelection = () => {
     setSelectedProduct(null);
 
     try {
-      const currency = accountCurrency || 'USD';
+      const currency = accountCurrency || getDefaultCheckoutCurrency();
       const filters = currentParentProduct
         ? { parentProduct: currentParentProduct, currency }
         : {
@@ -144,7 +145,7 @@ const ProductSelection = () => {
 
   const creditPartyIdentifier = selectedProduct?.CreditPartyIdentifiers?.[0];
   const identifierLabel = getDisplayIdentifierLabel(
-    creditPartyIdentifier?.Name || creditPartyIdentifier?.Title,
+    creditPartyIdentifier?.Title,
     {
       serviceName: service?.Name,
       providerName: provider?.Name || provider?.name,

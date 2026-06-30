@@ -7,8 +7,10 @@ import {
   buildPostPaymentPayload,
   buildValidatePaymentPayload,
   mapVasPaymentErrorToUiResult,
+  prepareFulfillmentValidation,
   resolveCustomerDetailsForVas,
 } from './vas/billPaymentPayload.js';
+import { productRequiresValidation } from '../utils/productValidation.js';
 
 class BankPaymentService {
   constructor() {
@@ -91,17 +93,25 @@ class BankPaymentService {
   }
 
   async ensureBillValidated(paymentData) {
+    const { product } = paymentData;
+
+    if (!productRequiresValidation(product)) {
+      const prepared = prepareFulfillmentValidation(paymentData.validationData, product);
+      return prepared.validationData;
+    }
+
     const { validateBillPayment } = await import('./billPaymentsApi.js');
     const customerDetails = await this.resolveCustomerDetails(paymentData);
     const currency = paymentData.currency || this.defaultCurrency;
 
     const payload = buildValidatePaymentPayload({
-      product: paymentData.product,
+      product,
       amount: paymentData.amount,
       currency,
       accountValue: paymentData.accountValue,
+      notifyNumber: paymentData.notifyNumber,
       customerDetails,
-      billReferenceNumber: 'pre-transfer-validate',
+      primaryFieldName: paymentData.primaryFieldName,
     });
 
     const result = await validateBillPayment(payload);
@@ -117,17 +127,38 @@ class BankPaymentService {
   }
 
   async postBillPaymentToVas(paymentData, bankReference) {
+    const { product } = paymentData;
+    const prepared = prepareFulfillmentValidation(paymentData.validationData, product);
+
+    if (!prepared.ok) {
+      if (prepared.skipResult) {
+        console.error('⚠️ Validation response missing RequestId; cannot post payment.');
+        return prepared.skipResult;
+      }
+
+      console.warn('ℹ️ Validation not successful or missing; skipping VAS PostPayment.', {
+        validationStatus: paymentData.validationData?.Status,
+      });
+      return null;
+    }
+
+    const fulfillmentValidation = prepared.validationData;
     const { postBillPayment } = await import('./billPaymentsApi.js');
-    const customerDetails = await this.resolveCustomerDetails(paymentData);
-    const currency = paymentData.currency || this.defaultCurrency;
+    const customerDetails = await this.resolveCustomerDetails({
+      ...paymentData,
+      validationData: fulfillmentValidation,
+    });
 
     const payload = buildPostPaymentPayload({
-      product: paymentData.product,
+      product,
       amount: paymentData.amount,
-      currency,
+      currency: paymentData.currency || this.defaultCurrency,
       accountValue: paymentData.accountValue,
+      notifyNumber: paymentData.notifyNumber,
       customerDetails,
+      validationData: fulfillmentValidation,
       bankReference,
+      primaryFieldName: paymentData.primaryFieldName,
     });
 
     console.log('📤 VAS PostPayment (bill):', payload);
@@ -172,7 +203,11 @@ class BankPaymentService {
       }
 
       let validationData = paymentData.validationData;
-      if (!validationData || validationData.Status !== 'VALIDATED') {
+      if (productRequiresValidation(paymentData.product)) {
+        if (!validationData || validationData.Status !== 'VALIDATED') {
+          validationData = await this.ensureBillValidated(paymentData);
+        }
+      } else {
         validationData = await this.ensureBillValidated(paymentData);
       }
 

@@ -2,11 +2,20 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button, Header, PageWrapper, Icon, Card, InputField } from '../components';
 import { appleTreeService } from '../services/appleTreeService';
-import AppleTreeGateway from '../services/appletree/AppleTreeGateway';
 import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
 import { getDisplayIdentifierLabel, getMinIdentifierLength } from '../utils/identifierLabel';
-import { resolveCustomerDetailsForVas } from '../services/vas/billPaymentPayload.js';
+import {
+  generateRequestId,
+  resolveCustomerDetailsForVas,
+} from '../services/vas/billPaymentPayload.js';
+import {
+  buildCreditPartyIdentifiers,
+  buildPaymentRecipient,
+  getFieldName,
+  productRequiresNotifyNumber,
+} from '../utils/creditPartyIdentifiers';
+import { productRequiresValidation } from '../utils/productValidation';
 import { getServiceIconName } from '../utils/serviceIcons';
 
 /** Bill amount from VAS, or payment field for variable-amount products. */
@@ -28,6 +37,7 @@ const AccountInput = () => {
   const { country, service, provider, product } = location.state || {};
 
   const [accountValue, setAccountValue] = useState('');
+  const [notifyNumber, setNotifyNumber] = useState('');
   const [amount, setAmount] = useState('');
   const [validationData, setValidationData] = useState(null);
   const [validating, setValidating] = useState(false);
@@ -36,6 +46,10 @@ const AccountInput = () => {
   const currentValidationRequestRef = useRef(null);
   const accountInputRef = useRef(null);
   const cursorPositionRef = useRef(null);
+  const customerDetailsRef = useRef(resolveCustomerDetailsForVas());
+
+  const showNotifyField = productRequiresNotifyNumber(product);
+  const validationRequired = productRequiresValidation(product);
 
   // Calculate if amount is fixed
   const minAmount = product?.MinimumAmount || product?.MinAmount || 0;
@@ -71,35 +85,41 @@ const AccountInput = () => {
   // Get credit party identifier info from product
   const creditPartyIdentifier = product?.CreditPartyIdentifiers?.[0];
   const fieldLabel = getDisplayIdentifierLabel(
-    creditPartyIdentifier?.Title || creditPartyIdentifier?.Name,
+    creditPartyIdentifier?.Title,
     {
       serviceName: service?.Name,
       providerName: provider?.Name || provider?.name,
       productName: product?.Name || product?.name
     }
   );
-  const fieldName = creditPartyIdentifier?.Name || 'AccountNumber';
+  const fieldName = getFieldName(creditPartyIdentifier);
+  const primaryFieldName = fieldName;
   const minAccountLength = getMinIdentifierLength(fieldLabel, fieldName);
 
-  // Get customer details from bridge (native/iframe/mock)
-  const getCustomerDetails = async () => {
-    try {
-      const { getUserInfo } = await import('../services/paymentBridge');
-      const userInfo = await getUserInfo();
-      
-      if (userInfo) {
-        return resolveCustomerDetailsForVas(userInfo);
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { getUserInfo } = await import('../services/paymentBridge');
+        const userInfo = await getUserInfo();
+        if (!cancelled && userInfo) {
+          customerDetailsRef.current = resolveCustomerDetailsForVas(userInfo);
+        }
+      } catch {
+        // Standalone / iframe without user info — defaults are fine
       }
-    } catch (error) {
-      console.warn('Could not get user info from bridge:', error);
-    }
+    })();
 
-    return resolveCustomerDetailsForVas();
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // Refs for validation payload (account + amount)
+  // Refs for validation payload (account, notify number, amount)
   const amountRef = useRef(amount);
   const accountValueRef = useRef(accountValue);
+  const notifyNumberRef = useRef(notifyNumber);
   
   useEffect(() => {
     amountRef.current = amount;
@@ -109,7 +129,15 @@ const AccountInput = () => {
     accountValueRef.current = accountValue;
   }, [accountValue]);
 
+  useEffect(() => {
+    notifyNumberRef.current = notifyNumber;
+  }, [notifyNumber]);
+
   const performValidation = useCallback(async () => {
+    if (!validationRequired) {
+      return;
+    }
+
     const currentAccountValue = accountValueRef.current;
     const currentAmount = amountRef.current;
     
@@ -121,7 +149,7 @@ const AccountInput = () => {
       return;
     }
 
-    const requestId = AppleTreeGateway.generateRequestId();
+    const requestId = generateRequestId();
     currentValidationRequestRef.current = requestId;
 
     setValidating(true);
@@ -129,39 +157,48 @@ const AccountInput = () => {
 
     try {
       const amountValue = parseFloat(currentAmount) || 0;
-      const customerDetails = await getCustomerDetails();
+      const customerDetails = customerDetailsRef.current;
 
       const validationPayload = {
         RequestId: requestId,
         Amount: amountValue,
-        CreditPartyIdentifiers: [
-          {
-            IdentifierFieldName: fieldName,
-            IdentifierFieldValue: currentAccountValue.trim()
-          }
-        ],
+        Recipient: buildPaymentRecipient({
+          accountValue: currentAccountValue.trim(),
+          notifyNumber: notifyNumberRef.current,
+          primaryFieldName,
+          customerDetails,
+          product,
+        }),
+        CreditPartyIdentifiers: buildCreditPartyIdentifiers({
+          product,
+          accountValue: currentAccountValue.trim(),
+          customerDetails,
+          notifyNumber: notifyNumberRef.current,
+          primaryFieldName,
+        }),
         Currency: currency,
         CustomerDetails: customerDetails,
         POSDetails: {
           CashierId: 'GetBucks',
           StoreId: 'GetBucks',
-          TerminalId: 'GetBucks'
+          TerminalId: 'GetBucks',
         },
         ProductId: product.Id || product.id,
-        Quantity: 1
+        Quantity: 1,
       };
 
       console.log('Validating payment with payload:', validationPayload);
 
       const result = await appleTreeService.validatePayment(validationPayload);
 
-      // Only update state if this is still the current validation request
       if (currentValidationRequestRef.current === requestId) {
-        if (result.success && result.data.Status === 'VALIDATED') {
+        if (result.success && result.data?.Status === 'VALIDATED') {
           setValidationData(result.data);
           setValidationError(null);
         } else {
-          setValidationError(result.data?.ResultMessage || result.error || 'Failed to validate account details.');
+          setValidationError(
+            result.data?.ResultMessage || result.error || 'Failed to validate account details.'
+          );
           setValidationData(null);
         }
         setValidating(false);
@@ -177,14 +214,18 @@ const AccountInput = () => {
         if (isNetworkError) {
           setValidationError('Network connection issue. Please check your internet connection and try again.');
         } else {
-          setValidationError(error.message || 'Failed to validate account details.');
+          const resultMessage =
+            error?.responseData?.details?.errors?.['CustomerDetails.EmailAddress']?.[0] ||
+            error?.responseData?.ResultMessage ||
+            error?.message;
+          setValidationError(resultMessage || 'Failed to validate account details.');
         }
         
         setValidationData(null);
         setValidating(false);
       }
     }
-  }, [product, fieldName, currency, minAccountLength]);
+  }, [product, currency, minAccountLength, validationRequired, primaryFieldName]);
 
   // Track if input was focused before validation
   const wasFocusedRef = useRef(false);
@@ -231,8 +272,15 @@ const AccountInput = () => {
     }
   }, [validating, accountValue.length]);
 
-  // Debounced validation when account or payment amount changes
+  // Debounced validation when account, notify number, or payment amount changes
   useEffect(() => {
+    if (!validationRequired) {
+      setValidationData(null);
+      setValidationError(null);
+      setValidating(false);
+      return;
+    }
+
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current);
     }
@@ -255,7 +303,7 @@ const AccountInput = () => {
         clearTimeout(validationTimeoutRef.current);
       }
     };
-  }, [accountValue, amount, performValidation, minAccountLength]);
+  }, [accountValue, notifyNumber, amount, performValidation, minAccountLength, validationRequired]);
 
   const handleContinue = () => {
     const amountValue = parseFloat(amount);
@@ -269,6 +317,8 @@ const AccountInput = () => {
           provider,
           product,
           accountValue,
+          primaryFieldName,
+          notifyNumber: notifyNumber.trim() || null,
           amount: amountValue,
           validationData: validationData
             ? { ...validationData, BillAmount: billAmount ?? validationData.BillAmount }
@@ -290,7 +340,11 @@ const AccountInput = () => {
   const isValidationSuccessful = validationData && validationData.Status === 'VALIDATED';
   const displayBillAmount = resolveDisplayBillAmount(validationData, amount, isFixedAmount);
   const hasValidationFailed =
-    isAccountCompleteEnough && !validating && !isValidationSuccessful && validationError;
+    validationRequired &&
+    isAccountCompleteEnough &&
+    !validating &&
+    !isValidationSuccessful &&
+    validationError;
   const canContinue = hasValidAccount && hasValidAmount;
 
   return (
@@ -343,7 +397,7 @@ const AccountInput = () => {
               required
             />
             
-            {validating && (
+            {validationRequired && validating && (
               <div className="mt-2 flex items-center text-xs text-gray-500">
                 <Icon name="refresh" size={16} className="text-[#faa819] animate-spin mr-2" />
                 Validating account...
@@ -351,8 +405,21 @@ const AccountInput = () => {
             )}
           </Card>
 
+          {showNotifyField && (
+            <Card className="mb-4">
+              <InputField
+                type="tel"
+                label="Notification number"
+                placeholder="Enter mobile number for token delivery"
+                value={notifyNumber}
+                onChange={(e) => setNotifyNumber(e.target.value)}
+              />
+            
+            </Card>
+          )}
+
           {/* Validation Success Display */}
-          {validationData && validationData.DisplayData && validationData.DisplayData.length > 0 && (
+          {validationRequired && validationData && validationData.DisplayData && validationData.DisplayData.length > 0 && (
             <Card className="mb-4" style={{ backgroundColor: colors.state.successLight, borderColor: colors.state.success }}>
               <div className="flex items-center mb-3">
                 <Icon name="check_circle" size={24} className="text-green-600 mr-2" />

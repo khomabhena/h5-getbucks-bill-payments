@@ -59,7 +59,7 @@ const ProductCard = ({
   
   // Get account identifier needed
   const accountIdentifier = getDisplayIdentifierLabel(
-    creditPartyIdentifiers?.[0]?.Title || creditPartyIdentifiers?.[0]?.Name,
+    creditPartyIdentifiers?.[0]?.Title,
     {
       serviceName: service?.Name,
       providerName: provider?.Name || provider?.name,

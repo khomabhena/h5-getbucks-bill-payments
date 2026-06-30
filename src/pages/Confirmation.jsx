@@ -1,7 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button, Header, PageWrapper, Icon, Card } from '../components';
 import { colors } from '../data/colors';
+import { productRequiresNotifyNumber } from '../utils/creditPartyIdentifiers';
+import {
+  resolveFulfillmentStatusCard,
+  resolveFulfillmentStatusLabel,
+  resolveFulfillmentUserMessage,
+} from '../utils/fulfillmentMessages';
+import { getBillPaymentReceiptPlainText } from '../utils/receiptText';
+import { copyText } from '../utils/copyText';
 
 // Format currency as "USD 10" or "ZAR 23" (currency code first, no decimals)
 const formatCurrencyCode = (amount, currency = 'USD') => {
@@ -10,6 +18,46 @@ const formatCurrencyCode = (amount, currency = 'USD') => {
   const roundedAmount = Math.round(amountValue);
   return `${currencyCode} ${roundedAmount}`;
 };
+
+function getVoucherToken(voucher = {}) {
+  return (
+    voucher.VoucherCode ||
+    voucher.Token ||
+    voucher.TokenNumber ||
+    voucher.Code ||
+    null
+  );
+}
+
+function isCopyableTokenLabel(label = '') {
+  const normalized = label.toLowerCase();
+  return (
+    normalized.includes('token') ||
+    normalized.includes('voucher') ||
+    normalized.includes('pin') ||
+    normalized.includes('recharge') ||
+    normalized.includes('serial')
+  );
+}
+
+function CopyButton({ fieldKey, copiedField, onCopy, compact = false }) {
+  const isCopied = copiedField === fieldKey;
+
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      className={`p-1 rounded transition-colors hover:bg-white/50 ${compact ? '' : ''}`}
+      title="Copy"
+    >
+      {isCopied ? (
+        <Icon name="check" size={16} className="text-green-600" />
+      ) : (
+        <Icon name="content_copy" size={16} className="text-gray-400" />
+      )}
+    </button>
+  );
+}
 
 const Confirmation = () => {
   const navigate = useNavigate();
@@ -23,43 +71,97 @@ const Confirmation = () => {
     service, 
     provider, 
     product, 
-    accountValue, 
+    accountValue,
+    notifyNumber,
     amount, 
     validationData,
     postPaymentResult
   } = location.state || {};
 
   const [copiedField, setCopiedField] = useState(null);
+  const [receiptCopyStatus, setReceiptCopyStatus] = useState(null);
+  const autoCopiedForRef = useRef(null);
+
+  const isPaymentSuccessful =
+    paymentStatus === 'SUCCESS' || getbucksPayment?.success === true;
+  const finalTransactionId = transactionId || getbucksPayment?.transactionId;
+
+  const receiptInput = useMemo(
+    () => ({
+      success: isPaymentSuccessful,
+      transactionId: finalTransactionId,
+      paymentStatus: paymentStatus || getbucksPayment?.status,
+      timestamp: timestamp || getbucksPayment?.timestamp,
+      country,
+      service,
+      provider,
+      product,
+      accountValue,
+      notifyNumber,
+      amount,
+      validationData,
+      postPaymentResult,
+    }),
+    [
+      isPaymentSuccessful,
+      finalTransactionId,
+      paymentStatus,
+      getbucksPayment,
+      timestamp,
+      country,
+      service,
+      provider,
+      product,
+      accountValue,
+      notifyNumber,
+      amount,
+      validationData,
+      postPaymentResult,
+    ]
+  );
+
+  const receiptPlainText = useMemo(
+    () => getBillPaymentReceiptPlainText(receiptInput),
+    [receiptInput]
+  );
+
+  const handleCopyReceipt = useCallback(
+    async (source = 'manual') => {
+      const ok = await copyText(receiptPlainText);
+      if (ok) {
+        setReceiptCopyStatus(source === 'auto' ? 'auto' : 'manual');
+        return true;
+      }
+      setReceiptCopyStatus('failed');
+      return false;
+    },
+    [receiptPlainText]
+  );
 
   // Redirect if no payment data
-  React.useEffect(() => {
-    if (!transactionId && !getbucksPayment?.transactionId) {
+  useEffect(() => {
+    if (!finalTransactionId) {
       navigate('/payment', { replace: true });
     }
-  }, [transactionId, getbucksPayment, navigate]);
+  }, [finalTransactionId, navigate]);
 
-  // Copy to clipboard function
+  // Auto-copy full receipt on payment completion (once per transaction)
+  useEffect(() => {
+    if (!finalTransactionId || !receiptPlainText) return;
+    if (autoCopiedForRef.current === finalTransactionId) return;
+
+    handleCopyReceipt('auto').then((ok) => {
+      if (ok) {
+        autoCopiedForRef.current = finalTransactionId;
+      }
+    });
+  }, [finalTransactionId, receiptPlainText, handleCopyReceipt]);
+
   const copyToClipboard = async (text, fieldName) => {
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await copyText(text);
+    if (ok) {
       setCopiedField(fieldName);
       setTimeout(() => setCopiedField(null), 2000);
-    } catch (err) {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      textArea.style.position = 'fixed';
-      textArea.style.opacity = '0';
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        setCopiedField(fieldName);
-        setTimeout(() => setCopiedField(null), 2000);
-      } catch (fallbackErr) {
-        console.error('Failed to copy:', fallbackErr);
-      }
-      document.body.removeChild(textArea);
     }
   };
 
@@ -82,14 +184,26 @@ const Confirmation = () => {
 
   const accountName = getAccountName();
   const currency = product?.Currency || product?.currency || 'USD';
-  const finalTransactionId = transactionId || getbucksPayment?.transactionId;
-  const isPaymentSuccessful = paymentStatus === 'SUCCESS' || getbucksPayment?.success === true;
   const fulfillmentResult = postPaymentResult || null;
-  const fulfillmentStatus = fulfillmentResult?.status;
+  const fulfillmentContext = {
+    amount,
+    currency,
+    accountValue,
+    providerName: provider?.Name || provider?.name,
+  };
+  const fulfillmentCard = resolveFulfillmentStatusCard(fulfillmentResult, fulfillmentContext);
   const fulfillmentSuccess = fulfillmentResult?.success === true;
-  const fulfillmentMessage = fulfillmentResult?.resultMessage;
+  const fulfillmentPending = fulfillmentResult?.isFailedRepeatable === true;
+  const fulfillmentFailedHard =
+    Boolean(fulfillmentResult) && !fulfillmentSuccess && !fulfillmentPending;
+  const fulfillmentUnavailable = isPaymentSuccessful && !fulfillmentResult;
+  const fulfillmentMessage = fulfillmentResult
+    ? resolveFulfillmentUserMessage(fulfillmentResult, fulfillmentContext)
+    : fulfillmentCard.message;
+  const fulfillmentStatusLabel = fulfillmentResult
+    ? resolveFulfillmentStatusLabel(fulfillmentResult)
+    : fulfillmentCard.title;
   const fulfillmentReferenceNumber = fulfillmentResult?.referenceNumber;
-  const fulfillmentRequestId = fulfillmentResult?.requestId;
   const vouchers = fulfillmentResult?.vouchers || [];
   const receiptHTML = fulfillmentResult?.receiptHTML || [];
   const receiptSmses = fulfillmentResult?.receiptSmses || [];
@@ -102,7 +216,7 @@ const Confirmation = () => {
         <Header title={isPaymentSuccessful ? "Payment Successful" : "Payment Status"} showBackButton={false} />
         
         {/* Main Content - Scrollable */}
-        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-32 overflow-y-auto border-x border-gray-200">
+        <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full pb-44 overflow-y-auto border-x border-gray-200">
           {/* Success Header */}
           {isPaymentSuccessful && (
             <div className="text-center mb-6">
@@ -116,7 +230,9 @@ const Confirmation = () => {
                 Payment Successful!
               </p>
               <p className="text-xs text-gray-600">
-                Your bill payment has been processed successfully
+                {fulfillmentSuccess
+                  ? 'Your bill payment has been processed successfully'
+                  : fulfillmentMessage}
               </p>
             </div>
           )}
@@ -203,6 +319,14 @@ const Confirmation = () => {
                         </span>
                       </div>
                     )}
+                    {productRequiresNotifyNumber(product) && notifyNumber && (
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-xs text-gray-500">Notification number</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[60%] break-words">
+                          {notifyNumber}
+                        </span>
+                      </div>
+                    )}
                     {accountName && accountName !== accountValue && (
                       <div className="flex justify-between items-start">
                         <span className="text-xs text-gray-500">Account Name</span>
@@ -259,39 +383,74 @@ const Confirmation = () => {
           </div>
 
           {/* Fulfillment Status */}
-          {fulfillmentResult && (
+          {(fulfillmentResult || fulfillmentUnavailable) && (
             <Card 
               className="mb-6" 
               style={{ 
-                backgroundColor: fulfillmentSuccess ? colors.state.successLight : colors.state.warningLight,
-                borderColor: fulfillmentSuccess ? colors.state.success : colors.state.warning
+                backgroundColor: fulfillmentSuccess
+                  ? colors.state.successLight
+                  : fulfillmentFailedHard || fulfillmentUnavailable
+                    ? colors.state.errorLight
+                    : colors.state.warningLight,
+                borderColor: fulfillmentSuccess
+                  ? colors.state.success
+                  : fulfillmentFailedHard || fulfillmentUnavailable
+                    ? colors.state.error
+                    : colors.state.warning
               }}
             >
               <div className="flex items-start space-x-3">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{
-                    backgroundColor: fulfillmentSuccess ? colors.state.success : colors.state.warning
+                    backgroundColor: fulfillmentSuccess
+                      ? colors.state.success
+                      : fulfillmentFailedHard || fulfillmentUnavailable
+                        ? colors.state.error
+                        : colors.state.warning
                   }}
                 >
                   {fulfillmentSuccess ? (
                     <Icon name="check_circle" size={20} className="text-white" />
+                  ) : fulfillmentFailedHard || fulfillmentUnavailable ? (
+                    <Icon name="error" size={20} className="text-white" />
                   ) : (
                     <Icon name="warning" size={20} className="text-white" />
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className={`font-semibold text-sm ${fulfillmentSuccess ? 'text-green-800' : 'text-amber-900'}`}>
-                    {fulfillmentSuccess ? 'Payment Fulfilled' : 'Fulfillment Pending'}
+                  <p
+                    className={`font-semibold text-sm ${
+                      fulfillmentSuccess
+                        ? 'text-green-800'
+                        : fulfillmentFailedHard || fulfillmentUnavailable
+                          ? 'text-red-800'
+                          : 'text-amber-900'
+                    }`}
+                  >
+                    {fulfillmentStatusLabel}
                   </p>
-                  <p className={`text-xs mt-1 ${fulfillmentSuccess ? 'text-green-700' : 'text-amber-700'}`}>
-                    {fulfillmentMessage ||
-                      (fulfillmentSuccess
-                        ? `Payment of ${formatCurrencyCode(amount || 0, currency)} has been processed for ${accountValue}`
-                        : 'The biller has not yet confirmed this transaction. Please try again shortly.')}
+                  <p
+                    className={`text-xs mt-1 ${
+                      fulfillmentSuccess
+                        ? 'text-green-700'
+                        : fulfillmentFailedHard || fulfillmentUnavailable
+                          ? 'text-red-700'
+                          : 'text-amber-700'
+                    }`}
+                  >
+                    {fulfillmentMessage}
                   </p>
                   {fulfillmentReferenceNumber && (
-                    <p className={`text-xs mt-2 ${fulfillmentSuccess ? 'text-green-700' : 'text-amber-700'}`}>
+                    <p
+                      className={`text-xs mt-2 ${
+                        fulfillmentSuccess
+                          ? 'text-green-700'
+                          : fulfillmentFailedHard || fulfillmentUnavailable
+                            ? 'text-red-700'
+                            : 'text-amber-700'
+                      }`}
+                    >
                       Reference: {fulfillmentReferenceNumber}
                     </p>
                   )}
@@ -309,10 +468,32 @@ const Confirmation = () => {
                   if (!item.Value || item.Value.trim() === '') {
                     return null;
                   }
+                  const fieldKey = `fulfillment-display-${index}`;
+                  const canCopy = isCopyableTokenLabel(item.Label);
                   return (
-                    <div key={`fulfillment-display-${index}`} className="flex flex-col">
-                      <span className="text-xs font-medium text-gray-600 mb-1">{item.Label}</span>
-                      <span className="text-sm text-gray-800 whitespace-pre-line">{item.Value}</span>
+                    <div key={fieldKey} className="flex flex-col">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-gray-600">{item.Label}</span>
+                        {canCopy && (
+                          <CopyButton
+                            fieldKey={fieldKey}
+                            copiedField={copiedField}
+                            onCopy={() => copyToClipboard(item.Value.trim(), fieldKey)}
+                            compact
+                          />
+                        )}
+                      </div>
+                      {canCopy ? (
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(item.Value.trim(), fieldKey)}
+                          className="w-full text-sm text-gray-800 whitespace-pre-line text-left font-mono font-semibold bg-white px-3 py-2 rounded border border-green-200 break-all"
+                        >
+                          {item.Value}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-gray-800 whitespace-pre-line">{item.Value}</span>
+                      )}
                     </div>
                   );
                 })}
@@ -330,6 +511,9 @@ const Confirmation = () => {
                   const daysUntilExpiry = expiryDate
                     ? Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24))
                     : null;
+                  const tokenValue = getVoucherToken(voucher);
+                  const serialFieldKey = `serial-${index}`;
+                  const tokenFieldKey = `token-${index}`;
 
                   return (
                     <div
@@ -354,19 +538,44 @@ const Confirmation = () => {
 
                       {voucher.SerialNumber && (
                         <div className="mb-3">
-                          <span className="text-xs font-medium" style={{ color: colors.text.secondary }}>Serial Number</span>
-                          <p className="font-mono font-semibold text-sm bg-white px-3 py-2 rounded border mt-1" style={{ borderColor: colors.border.primary }}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium" style={{ color: colors.text.secondary }}>Serial Number</span>
+                            <CopyButton
+                              fieldKey={serialFieldKey}
+                              copiedField={copiedField}
+                              onCopy={() => copyToClipboard(voucher.SerialNumber, serialFieldKey)}
+                              compact
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(voucher.SerialNumber, serialFieldKey)}
+                            className="w-full font-mono font-semibold text-sm bg-white px-3 py-2 rounded border mt-1 text-left break-all"
+                            style={{ borderColor: colors.border.primary }}
+                          >
                             {voucher.SerialNumber}
-                          </p>
+                          </button>
                         </div>
                       )}
 
-                      {voucher.VoucherCode && (
+                      {tokenValue && (
                         <div className="mb-3">
-                          <span className="text-xs font-medium" style={{ color: colors.text.secondary }}>Token</span>
-                          <p className="font-mono font-semibold text-base bg-white px-3 py-2 rounded border mt-1 break-all text-center" style={{ color: colors.app.primaryDark, borderColor: colors.border.secondary }}>
-                            {voucher.VoucherCode}
-                          </p>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium" style={{ color: colors.text.secondary }}>Token</span>
+                            <CopyButton
+                              fieldKey={tokenFieldKey}
+                              copiedField={copiedField}
+                              onCopy={() => copyToClipboard(tokenValue, tokenFieldKey)}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(tokenValue, tokenFieldKey)}
+                            className="w-full font-mono font-semibold text-base bg-white px-3 py-2 rounded border break-all text-center"
+                            style={{ color: colors.app.primaryDark, borderColor: colors.border.secondary }}
+                          >
+                            {tokenValue}
+                          </button>
                         </div>
                       )}
 
@@ -456,12 +665,33 @@ const Confirmation = () => {
           </p>
         </div>
 
-        {/* Fixed Button at Bottom */}
+        {/* Fixed Buttons at Bottom */}
         <div 
           style={{ backgroundColor: colors.background.secondary }} 
-          className="fixed bottom-0 left-0 right-0 bg-white pb-6 z-40"
+          className="fixed bottom-0 left-0 right-0 bg-white pb-6 z-40 border-t border-gray-100"
         >
-          <div className="max-w-md mx-auto px-4 pt-4">
+          <div className="max-w-md mx-auto px-4 pt-4 space-y-3">
+            {receiptCopyStatus === 'auto' && (
+              <p className="text-xs text-center text-gray-600">
+                Receipt copied to clipboard. Paste into Notes or WhatsApp to save it.
+              </p>
+            )}
+            {receiptCopyStatus === 'manual' && (
+              <p className="text-xs text-center text-gray-600">Receipt copied again.</p>
+            )}
+            {receiptCopyStatus === 'failed' && (
+              <p className="text-xs text-center text-amber-700">
+                Could not copy automatically. Tap the button below to try again.
+              </p>
+            )}
+            <Button
+              onClick={() => handleCopyReceipt('manual')}
+              variant="secondary"
+              fullWidth
+              size="lg"
+            >
+              {receiptCopyStatus === 'manual' ? 'Copied!' : 'Copy receipt info'}
+            </Button>
             <Button
               onClick={handleDone}
               fullWidth

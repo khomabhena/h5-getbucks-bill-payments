@@ -4,6 +4,8 @@ import { Button, Header, PageWrapper, Icon, Card } from '../components';
 import { ROUTES } from '../data/constants';
 import { colors } from '../data/colors';
 import { useSession } from '../context/SessionContext';
+import { productRequiresNotifyNumber } from '../utils/creditPartyIdentifiers';
+import { resolveFulfillmentStatusCard } from '../utils/fulfillmentMessages';
 
 // Local currency formatter (code + rounded amount)
 const formatCurrencyDisplay = (amount, currency = 'USD') => {
@@ -16,7 +18,7 @@ const formatCurrencyDisplay = (amount, currency = 'USD') => {
 const Payment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { country, service, provider, product, accountValue, amount, validationData } = location.state || {};
+  const { country, service, provider, product, accountValue, primaryFieldName, notifyNumber, amount, validationData } = location.state || {};
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -52,7 +54,7 @@ const Payment = () => {
     setError(null);
     setStatusCard({
       title: 'Processing Payment',
-      message: 'Validating bill and processing bank transfer…',
+      message: 'Processing bank transfer and fetching your voucher…',
       tone: 'info',
     });
 
@@ -63,6 +65,8 @@ const Payment = () => {
         amount,
         currency: product?.Currency || product?.currency || accountCurrency || 'USD',
         accountValue,
+        primaryFieldName,
+        notifyNumber,
         product,
         provider,
         country,
@@ -79,15 +83,15 @@ const Payment = () => {
         throw new Error(paymentResult.message || 'Payment failed');
       }
 
-      const vasOk = paymentResult.postPaymentResult?.success;
-      setStatusCard({
-        title: vasOk ? 'Payment Complete' : 'Transfer Complete',
-        message: vasOk
-          ? 'Your bill payment has been processed successfully.'
-          : paymentResult.postPaymentResult?.resultMessage ||
-            'Bank transfer succeeded but bill posting needs attention.',
-        tone: vasOk ? 'success' : 'warning',
-      });
+      const postPaymentResult = paymentResult.postPaymentResult || null;
+      const fulfillmentContext = {
+        amount,
+        currency: product?.Currency || product?.currency || accountCurrency || 'USD',
+        accountValue,
+        providerName: provider?.Name || provider?.name,
+      };
+
+      setStatusCard(resolveFulfillmentStatusCard(postPaymentResult, fulfillmentContext));
 
       // Notify parent if in iframe mode
       const { getMode } = await import('../utils/modeDetection');
@@ -119,6 +123,7 @@ const Payment = () => {
           provider,
           product,
           accountValue,
+          notifyNumber,
           amount,
           validationData: paymentResult.validationData || validationData,
           postPaymentResult: paymentResult.postPaymentResult,
@@ -271,6 +276,14 @@ const Payment = () => {
                       {accountValue || 'N/A'}
                     </span>
                   </div>
+                  {productRequiresNotifyNumber(product) && notifyNumber && (
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs text-gray-500">Notification number</span>
+                      <span className="text-sm font-medium text-gray-900 text-right max-w-[60%] break-words">
+                        {notifyNumber}
+                      </span>
+                    </div>
+                  )}
                   {accountName && accountName !== accountValue && (
                     <div className="flex justify-between items-start">
                       <span className="text-xs text-gray-500">Account Name</span>

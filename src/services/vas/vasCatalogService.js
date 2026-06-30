@@ -3,6 +3,11 @@
  */
 
 import { vasCatalogUrl } from '../../config/api.js';
+import {
+  getCatalogQueryCurrency,
+  matchesCatalogCurrency,
+} from '../../config/catalogCurrency.js';
+import { filterBillPaymentServices } from '../../utils/billPaymentServices.js';
 import { vasJson } from './vasHttp.js';
 
 function catalogUrl(path, query = {}) {
@@ -17,35 +22,29 @@ function catalogUrl(path, query = {}) {
 }
 
 function extractProducts(data) {
-  return data.ServiceProducts || data.Products || data.Data || [];
+  const products = data.ServiceProducts || data.Products || data.Data || [];
+  return Array.isArray(products) ? products : [];
 }
 
 function extractProviders(data) {
   return data.ServiceProviders || data.Providers || [];
 }
 
-function extractCountries(data) {
-  return data.Countries || data.countries || [];
-}
-
-const MOBILE_SERVICE_IDS = new Set([1, 2, 3]);
-
-function isBillPaymentService(service) {
-  const id = Number(service?.Id ?? service?.id);
-  return Number.isFinite(id) && !MOBILE_SERVICE_IDS.has(id);
+function filterProductsByCurrency(products, preferredCurrency) {
+  if (!Array.isArray(products)) return [];
+  return products.filter((product) => matchesCatalogCurrency(product, preferredCurrency));
 }
 
 class VasCatalogService {
-  /**
-   * Full service list from VAS (no country filter on this call).
-   */
-  async getServices(_countryCodeIgnored) {
+  async getServices(countryCode = null) {
     try {
-      const data = await vasJson(catalogUrl('/services'));
+      const query = countryCode ? { countryCode } : {};
+      const data = await vasJson(catalogUrl('/services', query));
       const services = data.Services || data;
       return {
         success: true,
         data: Array.isArray(services) ? services : [],
+        response: data,
         source: 'vas',
       };
     } catch (error) {
@@ -54,62 +53,16 @@ class VasCatalogService {
     }
   }
 
-  async getCountriesForService(serviceId) {
-    try {
-      const data = await vasJson(catalogUrl('/countries', { service: serviceId }));
-      return {
-        success: true,
-        data: extractCountries(data),
-      };
-    } catch (error) {
-      console.error('VAS getCountriesForService failed:', error);
-      return { success: false, error: error.message, data: [] };
-    }
-  }
-
   /**
-   * Bill payment services for a country.
-   * VAS /Services?countryCode=ZW often returns only a subset (e.g. Electricity + DSTV);
-   * we load the full catalog then keep services that list the country (or all bill types as fallback).
+   * Bill payment services for a country (Tapseed pattern).
    */
   async getBillPaymentServicesForCountry(countryCode) {
-    const allResult = await this.getServices();
-    if (!allResult.success) {
-      return allResult;
+    const result = await this.getServices(countryCode);
+    if (!result.success) {
+      return result;
     }
 
-    const billServices = allResult.data.filter(isBillPaymentService);
-    if (!countryCode) {
-      return { success: true, data: billServices, source: 'vas' };
-    }
-
-    const checks = await Promise.all(
-      billServices.map(async (service) => {
-        const serviceId = service.Id ?? service.id;
-        const countriesResult = await this.getCountriesForService(serviceId);
-        const countries = countriesResult.data || [];
-        const supportsCountry = countries.some(
-          (c) =>
-            String(c.Code || c.code || '').toUpperCase() ===
-            String(countryCode).toUpperCase()
-        );
-        return supportsCountry ? service : null;
-      })
-    );
-
-    const forCountry = checks.filter(Boolean);
-
-    if (forCountry.length > 0) {
-      console.log(
-        `ℹ️ ${forCountry.length} bill service(s) support ${countryCode}:`,
-        forCountry.map((s) => s.Name).join(', ')
-      );
-      return { success: true, data: forCountry, source: 'vas' };
-    }
-
-    console.warn(
-      `⚠️ No bill services matched ${countryCode} via /countries — showing full bill catalog (${billServices.length})`
-    );
+    const billServices = filterBillPaymentServices(result.data);
     return { success: true, data: billServices, source: 'vas' };
   }
 
@@ -135,12 +88,14 @@ class VasCatalogService {
   async getProducts(filters, useCache = true) {
     void useCache;
     try {
+      const preferredCurrency = filters.currency;
+      const queryCurrency = getCatalogQueryCurrency(preferredCurrency);
       let query;
 
       if (filters.parentProduct) {
         query = {
           parentProduct: filters.parentProduct,
-          currency: filters.currency || 'USD',
+          ...(queryCurrency ? { currency: queryCurrency } : {}),
         };
       } else {
         if (!filters.countryCode || !filters.serviceId) {
@@ -150,17 +105,18 @@ class VasCatalogService {
         query = {
           countryCode: filters.countryCode,
           service: filters.serviceId,
-          currency: filters.currency || 'USD',
+          ...(queryCurrency ? { currency: queryCurrency } : {}),
         };
         if (filters.serviceProviderId) {
-          query.serviceProviderId = filters.serviceProviderId;
+          query.serviceProvider = filters.serviceProviderId;
         }
       }
 
       const data = await vasJson(catalogUrl('/products', query));
+      const products = filterProductsByCurrency(extractProducts(data), preferredCurrency);
       return {
         success: true,
-        data: extractProducts(data),
+        data: products,
         source: 'vas',
       };
     } catch (error) {
