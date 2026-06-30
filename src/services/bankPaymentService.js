@@ -218,9 +218,16 @@ class BankPaymentService {
       // Generate transaction reference
       const reference = this.generateReference();
 
-      // Prepare transfer data
+      // Prepare transfer data — bank debit uses account currency; VAS uses product currency.
       const amount = parseFloat(paymentData.amount);
-      const currency = paymentData.currency || this.defaultCurrency;
+      const vasCurrency = (paymentData.currency || this.defaultCurrency).toString().toUpperCase();
+      const bankCurrency = (
+        paymentData.bankCurrency ||
+        paymentData.accountCurrency ||
+        vasCurrency
+      )
+        .toString()
+        .toUpperCase();
       const productName = paymentData.product?.Name || paymentData.product?.name || 'Bill Payment';
       const providerName = paymentData.provider?.Name || paymentData.provider?.name || 'Provider';
       const accountValue = paymentData.accountValue || '';
@@ -234,16 +241,22 @@ class BankPaymentService {
         externalReference: reference,
         clientNumber: clientNumber,
         debitAccount: debitAccount,
-        debitCurrency: currency,
+        debitCurrency: bankCurrency,
         debitAmount: amount,
         creditAccount: this.merchantAccount,
-        creditCurrency: currency,
+        creditCurrency: bankCurrency,
         creditAmount: amount,
         debitNarrative1: debitNarrative1,
         creditNarrative1: creditNarrative1,
         valueDate: new Date().toISOString(),
-        sessionID: paymentData.sessionID || null
+        sessionID: paymentData.sessionID || null,
       };
+
+      console.log('🏦 Bank transfer payload:', {
+        ...transferData,
+        vasCurrency,
+        bankCurrency,
+      });
       
       // Add provider name to debit narrative 2 if available
       if (providerName) {
@@ -297,7 +310,7 @@ class BankPaymentService {
           : 'Bank payment recorded; bill fulfillment pending or failed',
         timestamp: new Date().toISOString(),
         amount: paymentData.amount,
-        currency,
+        currency: vasCurrency,
         validationData,
         postPaymentResult,
       };
@@ -317,6 +330,16 @@ class BankPaymentService {
         errorMessage = 'Unable to access your account. Please ensure you are logged in.';
       } else if (error.message.includes('Merchant account not configured')) {
         errorMessage = 'Payment service is not properly configured. Please contact support.';
+      } else if (error.message.includes('SessionID invalid') || error.message.includes('sessionID')) {
+        errorMessage = 'Your banking session is invalid or expired. Please close this page and open bill payments again from your bank app.';
+      } else if (
+        error.message.includes('Insufficient Funds') ||
+        error.message.includes('Insufficient funds')
+      ) {
+        errorMessage = 'Insufficient funds in your account for this payment.';
+      } else if (error.message.includes('Invalid Currency')) {
+        errorMessage =
+          'This payment currency does not match your account. Try a product in your account currency or contact support.';
       } else if (error.message.includes('Credit Narrative invalid') || error.message.includes('credit narrative')) {
         errorMessage = 'Payment configuration error. Please contact support.';
         console.error('❌ Credit Narrative Error - Check narrative format and length');

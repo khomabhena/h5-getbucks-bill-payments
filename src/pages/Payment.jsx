@@ -61,9 +61,21 @@ const Payment = () => {
     try {
       const { bankPaymentService } = await import('../services/bankPaymentService');
 
+      const productCurrency = (
+        product?.Currency ||
+        product?.currency ||
+        accountCurrency ||
+        'USD'
+      )
+        .toString()
+        .toUpperCase();
+      const bankCurrency = (accountCurrency || productCurrency || 'USD').toString().toUpperCase();
+
       const paymentData = {
         amount,
-        currency: product?.Currency || product?.currency || accountCurrency || 'USD',
+        currency: productCurrency,
+        bankCurrency,
+        accountCurrency: bankCurrency,
         accountValue,
         primaryFieldName,
         notifyNumber,

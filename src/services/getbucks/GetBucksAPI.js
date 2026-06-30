@@ -6,6 +6,57 @@
 import { getBucksAuth } from './GetBucksAuth.js';
 import { bankwareUrl } from '../../config/api.js';
 
+function extractBankWareErrorMessage(errorData, fallback) {
+  const errors = errorData?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const messages = errors
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return String(entry || '').trim();
+        }
+
+        const message =
+          entry.message ||
+          entry.Message ||
+          entry.error ||
+          entry.Error ||
+          entry.detail ||
+          entry.Detail;
+
+        const code = entry.code || entry.Code;
+        if (message) {
+          return code ? `[${code}] ${message}` : message;
+        }
+
+        const serialized = JSON.stringify(entry);
+        return serialized === '{}' ? '' : serialized;
+      })
+      .filter(Boolean);
+
+    if (messages.length > 0) {
+      return messages.join('; ');
+    }
+  }
+
+  return (
+    errorData?.message ||
+    errorData?.Message ||
+    errorData?.error ||
+    errorData?.Error ||
+    fallback
+  );
+}
+
+export function isValidSessionGuid(value) {
+  if (!value || typeof value !== 'string') {
+    return false;
+  }
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value.trim()
+  );
+}
+
 class GetBucksAPI {
   constructor() {
     this.baseUrl = bankwareUrl;
@@ -136,19 +187,10 @@ class GetBucksAPI {
         }
       }
       
-      // Handle GetBucks error format: { errors: [{ code, message }] }
-      let errorMessage = `Failed to get account transfer: ${response.status} ${response.statusText}`;
-      if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
-        const firstError = errorData.errors[0];
-        errorMessage = firstError.message || errorMessage;
-        if (firstError.code) {
-          errorMessage = `[${firstError.code}] ${errorMessage}`;
-        }
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      } else if (errorData.error) {
-        errorMessage = errorData.error;
-      }
+      const errorMessage = extractBankWareErrorMessage(
+        errorData,
+        `Failed to get account transfer: ${response.status} ${response.statusText}`
+      );
       
       const error = new Error(errorMessage);
       error.rawResponse = errorData;
@@ -223,9 +265,9 @@ class GetBucksAPI {
       blockReference: transferData.blockReference || ''
     };
 
-    // Add sessionID if provided (for iBank validation)
-    if (transferData.sessionID) {
-      body.sessionID = transferData.sessionID;
+    // Add sessionID only when it is a valid GUID (iBank session validation)
+    if (isValidSessionGuid(transferData.sessionID)) {
+      body.sessionID = transferData.sessionID.trim();
     }
 
     // Add narratives (optional)
@@ -266,20 +308,10 @@ class GetBucksAPI {
     if (!response.ok) {
       const errorData = await this.parseJsonResponse(response, {});
       
-      // Handle GetBucks error format: { errors: [{ code, message }] }
-      let errorMessage = `Failed to create account transfer: ${response.status} ${response.statusText}`;
-      if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
-        const firstError = errorData.errors[0];
-        errorMessage = firstError.message || errorMessage;
-        // Include error code if available
-        if (firstError.code) {
-          errorMessage = `[${firstError.code}] ${errorMessage}`;
-        }
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      } else if (errorData.error) {
-        errorMessage = errorData.error;
-      }
+      const errorMessage = extractBankWareErrorMessage(
+        errorData,
+        `Failed to create account transfer: ${response.status} ${response.statusText}`
+      );
       
       const error = new Error(errorMessage);
       error.rawResponse = errorData;
@@ -329,19 +361,10 @@ class GetBucksAPI {
     if (!response.ok) {
       const errorData = await this.parseJsonResponse(response, {});
       
-      // Handle GetBucks error format: { errors: [{ code, message }] }
-      let errorMessage = `Failed to cancel account transfer: ${response.status} ${response.statusText}`;
-      if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
-        const firstError = errorData.errors[0];
-        errorMessage = firstError.message || errorMessage;
-        if (firstError.code) {
-          errorMessage = `[${firstError.code}] ${errorMessage}`;
-        }
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      } else if (errorData.error) {
-        errorMessage = errorData.error;
-      }
+      const errorMessage = extractBankWareErrorMessage(
+        errorData,
+        `Failed to cancel account transfer: ${response.status} ${response.statusText}`
+      );
       
       const error = new Error(errorMessage);
       error.rawResponse = errorData;
