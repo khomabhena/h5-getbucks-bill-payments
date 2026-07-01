@@ -6,6 +6,7 @@ import { colors } from '../data/colors';
 import { useSession } from '../context/SessionContext';
 import { productRequiresNotifyNumber } from '../utils/creditPartyIdentifiers';
 import { resolveFulfillmentStatusCard } from '../utils/fulfillmentMessages';
+import { getBankCalendarDateToday } from '../utils/bankValueDate';
 
 // Local currency formatter (code + rounded amount)
 const formatCurrencyDisplay = (amount, currency = 'USD') => {
@@ -23,6 +24,8 @@ const Payment = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [statusCard, setStatusCard] = useState(null);
+  /** YYYY-MM-DD — bank business date for transfer; user can change when EOD differs from local clock */
+  const [valueDateCalendar, setValueDateCalendar] = useState(getBankCalendarDateToday);
   const { sessionId, accountNumber, clientNumber, accountCurrency } = useSession();
 
   // Redirect if no required data
@@ -87,6 +90,7 @@ const Payment = () => {
         sessionID: sessionId || null,
         accountNumber: accountNumber || null,
         clientNumber: clientNumber || null,
+        valueDateCalendar,
       };
 
       const paymentResult = await bankPaymentService.processGetBucksPayment(paymentData);
@@ -357,6 +361,31 @@ const Payment = () => {
                 <p className="font-medium text-sm" style={{color: colors.text.primary}}>Secure Payment</p>
                 <p className="text-xs" style={{color: colors.text.secondary}}>Your payment is encrypted and secure</p>
               </div>
+            </div>
+          </Card>
+
+          {/* Transfer value date — manual override when bank EOD differs from your clock */}
+          <Card className="mb-4" style={{ backgroundColor: colors.background.secondary, borderColor: colors.border.primary }}>
+            <div className="space-y-2">
+              <label
+                htmlFor="transfer-value-date"
+                className="block text-sm font-medium"
+                style={{ color: colors.text.primary }}
+              >
+                Transfer value date
+              </label>
+              <input
+                id="transfer-value-date"
+                type="date"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-[#faa819] focus:outline-none focus:ring-1 focus:ring-[#faa819] disabled:bg-gray-100"
+                value={valueDateCalendar}
+                onChange={(e) => setValueDateCalendar(e.target.value)}
+                disabled={isProcessing}
+              />
+              <p className="text-xs leading-snug" style={{ color: colors.text.secondary }}>
+                Defaults to today in the bank calendar. Change if end-of-day processing means the
+                bank is still on the previous business date (or already on the next).
+              </p>
             </div>
           </Card>
 
