@@ -66,7 +66,10 @@ const AppShell = () => {
           sessionId: payload?.sessionID || payload?.sessionId || null,
           tokenPayload: payload,
           accountNumber,
-          clientNumber: params.clientNumber || null,
+          clientNumber:
+            params.clientNumber ||
+            currencyResult?.clientNumber ||
+            null,
           accountCurrency: currencyResult?.vasCurrency || 'USD',
           currencyCode: currencyResult?.currencyCode || 'USD',
         });

@@ -37,6 +37,10 @@ function extractBankWareErrorMessage(errorData, fallback) {
     if (messages.length > 0) {
       return messages.join('; ');
     }
+
+    if (errors.some((entry) => entry && typeof entry === 'object')) {
+      return 'Bank session validation failed. Reopen bill payments from your bank app and try again.';
+    }
   }
 
   return (

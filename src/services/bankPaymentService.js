@@ -369,8 +369,13 @@ class BankPaymentService {
           error.message.includes('contact support')
             ? error.message
             : 'Bill payment settlement account is not configured. Please contact support.';
-      } else if (error.message.includes('SessionID invalid') || error.message.includes('sessionID')) {
-        errorMessage = 'Your banking session is invalid or expired. Please close this page and open bill payments again from your bank app.';
+      } else if (
+        error.message.includes('SessionID invalid') ||
+        error.message.includes('sessionID') ||
+        error.message.includes('Bank session validation failed')
+      ) {
+        errorMessage =
+          'Your banking session could not be validated for this account. Close this page and open bill payments again from your bank app.';
       } else if (
         error.message.includes('Insufficient Funds') ||
         error.message.includes('Insufficient funds')
