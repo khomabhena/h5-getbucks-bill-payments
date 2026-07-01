@@ -216,7 +216,6 @@ class BankPaymentService {
    * @param {string} paymentData.accountValue - Bill account number/identifier
    * @param {Object} paymentData.product - Product details
    * @param {Object} paymentData.provider - Provider details
-   * @param {string} paymentData.sessionID - Session ID for iBank validation
    * @param {string} paymentData.accountNumber - Customer account number
    * @param {string} paymentData.clientNumber - Client number
    * @returns {Promise<Object>} Payment result with transactionId, status, etc.
@@ -281,7 +280,6 @@ class BankPaymentService {
         debitNarrative1: debitNarrative1,
         creditNarrative1: creditNarrative1,
         valueDate: resolveTransferValueDate(paymentData),
-        sessionID: paymentData.sessionID || null,
       };
 
       console.log('🏦 Bank transfer payload:', {

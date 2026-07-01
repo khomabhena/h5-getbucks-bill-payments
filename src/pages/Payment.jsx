@@ -87,7 +87,6 @@ const Payment = () => {
         country,
         service,
         validationData,
-        sessionID: sessionId || null,
         accountNumber: accountNumber || null,
         clientNumber: clientNumber || null,
         valueDateCalendar,
