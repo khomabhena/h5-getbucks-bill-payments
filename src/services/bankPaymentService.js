@@ -3,6 +3,7 @@
  */
 
 import { getBucksAPI } from './getbucks';
+import { resolveTransferValueDate } from '../utils/bankValueDate.js';
 import {
   buildPostPaymentPayload,
   buildValidatePaymentPayload,
@@ -248,7 +249,7 @@ class BankPaymentService {
         creditAmount: amount,
         debitNarrative1: debitNarrative1,
         creditNarrative1: creditNarrative1,
-        valueDate: new Date().toISOString(),
+        valueDate: resolveTransferValueDate(paymentData),
         sessionID: paymentData.sessionID || null,
       };
 

@@ -4,6 +4,7 @@
  */
 
 import { getBucksAuth } from './GetBucksAuth.js';
+import { getBankValueDateIso } from '../../utils/bankValueDate.js';
 import { bankwareUrl } from '../../config/api.js';
 
 function extractBankWareErrorMessage(errorData, fallback) {
@@ -259,7 +260,7 @@ class GetBucksAPI {
       creditAccount: transferData.creditAccount,
       creditCurrency: transferData.creditCurrency,
       creditAmount: transferData.creditAmount,
-      valueDate: transferData.valueDate || new Date().toISOString(),
+      valueDate: transferData.valueDate || getBankValueDateIso(),
       exchangeRate: transferData.exchangeRate || 0,
       chargesBourneBy: transferData.chargesBourneBy || 0,
       blockReference: transferData.blockReference || ''
