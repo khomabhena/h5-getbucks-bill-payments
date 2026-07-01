@@ -15,12 +15,45 @@ import { productRequiresValidation } from '../utils/productValidation.js';
 
 class BankPaymentService {
   constructor() {
-    // Merchant/Bill Payments account number (credit account)
-    // Default: 00001205 (can be overridden via env var)
-    this.merchantAccount = import.meta.env.VITE_GETBUCKS_MERCHANT_ACCOUNT || '00001205';
-    
+    this.merchantAccountCache = new Map();
+    this.envMerchantFallback = import.meta.env.VITE_GETBUCKS_MERCHANT_ACCOUNT || '';
+
     // Currency for transfers (default to USD, can be overridden)
     this.defaultCurrency = import.meta.env.VITE_GETBUCKS_DEFAULT_CURRENCY || 'USD';
+  }
+
+  async resolveMerchantAccount(currency = 'USD') {
+    const key = String(currency || this.defaultCurrency).trim().toUpperCase();
+
+    if (this.merchantAccountCache.has(key)) {
+      return this.merchantAccountCache.get(key);
+    }
+
+    try {
+      const { fetchMerchantAccount } = await import('./paymentConfigService.js');
+      const result = await fetchMerchantAccount({
+        app: 'bill-payments',
+        currency: key,
+      });
+
+      if (result?.merchantAccount) {
+        this.merchantAccountCache.set(key, result.merchantAccount);
+        return result.merchantAccount;
+      }
+    } catch (error) {
+      console.warn('Merchant account config fetch failed, using env fallback:', error);
+    }
+
+    const fallback = this.envMerchantFallback;
+    if (!fallback) {
+      throw new Error(
+        'Merchant account is not configured on the server. Set BANKWARE_MERCHANT_ACCOUNT_BILL_PAYMENTS on the VAS server.'
+      );
+    }
+
+    console.warn(`⚠️ Using VITE_GETBUCKS_MERCHANT_ACCOUNT fallback for ${key}`);
+    this.merchantAccountCache.set(key, fallback);
+    return fallback;
   }
 
   /**
@@ -199,10 +232,6 @@ class BankPaymentService {
         throw new Error('Product and account details are required');
       }
 
-      if (!this.merchantAccount) {
-        throw new Error('Merchant account not configured. Please set VITE_GETBUCKS_MERCHANT_ACCOUNT');
-      }
-
       let validationData = paymentData.validationData;
       if (productRequiresValidation(paymentData.product)) {
         if (!validationData || validationData.Status !== 'VALIDATED') {
@@ -233,6 +262,8 @@ class BankPaymentService {
       const providerName = paymentData.provider?.Name || paymentData.provider?.name || 'Provider';
       const accountValue = paymentData.accountValue || '';
 
+      const merchantAccount = await this.resolveMerchantAccount(bankCurrency);
+
       // Build narratives for bill payment transactions
       const debitNarrative1 = 'Bill Payment';
       const creditNarrative1 = 'Bill Payment Service';
@@ -244,7 +275,7 @@ class BankPaymentService {
         debitAccount: debitAccount,
         debitCurrency: bankCurrency,
         debitAmount: amount,
-        creditAccount: this.merchantAccount,
+        creditAccount: merchantAccount,
         creditCurrency: bankCurrency,
         creditAmount: amount,
         debitNarrative1: debitNarrative1,
@@ -257,6 +288,7 @@ class BankPaymentService {
         ...transferData,
         vasCurrency,
         bankCurrency,
+        merchantAccount,
       });
       
       // Add provider name to debit narrative 2 if available
@@ -329,8 +361,14 @@ class BankPaymentService {
       
       if (error.message.includes('account number not available')) {
         errorMessage = 'Unable to access your account. Please ensure you are logged in.';
-      } else if (error.message.includes('Merchant account not configured')) {
-        errorMessage = 'Payment service is not properly configured. Please contact support.';
+      } else if (
+        error.message.includes('Merchant account') ||
+        error.message.includes('settlement account')
+      ) {
+        errorMessage =
+          error.message.includes('contact support')
+            ? error.message
+            : 'Bill payment settlement account is not configured. Please contact support.';
       } else if (error.message.includes('SessionID invalid') || error.message.includes('sessionID')) {
         errorMessage = 'Your banking session is invalid or expired. Please close this page and open bill payments again from your bank app.';
       } else if (
