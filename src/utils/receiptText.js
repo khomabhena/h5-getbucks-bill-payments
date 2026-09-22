@@ -129,7 +129,6 @@ export const generateBillPaymentReceiptPlainText = (receiptData) => {
     'BILL DETAILS',
     `Provider: ${receiptData.providerName}`,
     `Product: ${receiptData.productName}`,
-    receiptData.productId ? `Product ID: ${receiptData.productId}` : null,
     `Account: ${receiptData.accountValue}`,
     receiptData.accountName ? `Account name: ${receiptData.accountName}` : null,
     receiptData.notifyNumber ? `Notification number: ${receiptData.notifyNumber}` : null,

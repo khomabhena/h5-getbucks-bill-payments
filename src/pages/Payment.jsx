@@ -7,19 +7,24 @@ import { useSession } from '../context/SessionContext';
 import { productRequiresNotifyNumber } from '../utils/creditPartyIdentifiers';
 import { resolveFulfillmentStatusCard } from '../utils/fulfillmentMessages';
 import { getBankCalendarDateToday } from '../utils/bankValueDate';
+import {
+  getChargeBreakdown,
+  resolveDebitAmount,
+  shouldDisplayCharges,
+} from '../utils/billExtras';
 
 // Local currency formatter (code + rounded amount)
 const formatCurrencyDisplay = (amount, currency = 'USD') => {
   const currencyCode = (currency || 'USD').toUpperCase();
   const amountValue = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
-  const roundedAmount = Math.round(amountValue);
-  return `${currencyCode} ${roundedAmount}`;
+  const roundedAmount = Math.round(amountValue * 100) / 100;
+  return `${currencyCode} ${roundedAmount.toFixed(2)}`;
 };
 
 const Payment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { country, service, provider, product, accountValue, primaryFieldName, notifyNumber, amount, validationData } = location.state || {};
+  const { country, service, provider, product, accountValue, primaryFieldName, notifyNumber, amount, validationData, selectedAddon, payUsingReferenceNumber } = location.state || {};
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -87,6 +92,8 @@ const Payment = () => {
         country,
         service,
         validationData,
+        selectedAddon: selectedAddon || null,
+        payUsingReferenceNumber: Boolean(payUsingReferenceNumber),
         accountNumber: accountNumber || null,
         clientNumber: clientNumber || null,
         valueDateCalendar,
@@ -190,6 +197,9 @@ const Payment = () => {
 
   const currency = product?.Currency || product?.currency || accountCurrency || 'USD';
   const accountName = getAccountName();
+  const debitAmount = resolveDebitAmount(validationData, amount);
+  const chargeBreakdown = getChargeBreakdown(validationData);
+  const showCharges = shouldDisplayCharges(product, validationData);
 
   const getStatusCardStyle = () => {
     if (!statusCard) return {};
@@ -325,13 +335,39 @@ const Payment = () => {
                     backgroundColor: colors.app.primaryLight + '20'
                   }}
                 >
+                  {showCharges && chargeBreakdown && (
+                    <div className="space-y-2 mb-3">
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Principal</span>
+                        <span>{formatCurrencyDisplay(chargeBreakdown.principalAmount, currency)}</span>
+                      </div>
+                      {chargeBreakdown.billerCharge > 0 && (
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Biller charge</span>
+                          <span>{formatCurrencyDisplay(chargeBreakdown.billerCharge, currency)}</span>
+                        </div>
+                      )}
+                      {chargeBreakdown.taxCharge > 0 && (
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Tax</span>
+                          <span>{formatCurrencyDisplay(chargeBreakdown.taxCharge, currency)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {selectedAddon?.Name && (
+                    <div className="flex justify-between text-xs text-gray-600 mb-2">
+                      <span>Add-on</span>
+                      <span className="text-right max-w-[60%]">{selectedAddon.Name}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-base font-bold text-gray-900">Total Amount</span>
                     <span 
                       className="text-xl font-bold"
                       style={{ color: colors.app.primaryDark }}
                     >
-                      {formatCurrencyDisplay(amount, currency)}
+                      {formatCurrencyDisplay(debitAmount, currency)}
                     </span>
                   </div>
                 </div>
@@ -423,7 +459,7 @@ const Payment = () => {
               fullWidth
               size="lg"
             >
-              {isProcessing ? 'Processing...' : `Pay ${formatCurrencyDisplay(amount, currency)}`}
+              {isProcessing ? 'Processing...' : `Pay ${formatCurrencyDisplay(debitAmount, currency)}`}
             </Button>
           </div>
         </div>

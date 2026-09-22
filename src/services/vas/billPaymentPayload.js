@@ -8,6 +8,10 @@ import {
   buildPaymentRecipient,
 } from '../../utils/creditPartyIdentifiers.js';
 import { productRequiresValidation } from '../../utils/productValidation.js';
+import {
+  buildSelectedProductAddOns,
+  resolveVasPostAmount,
+} from '../../utils/billExtras.js';
 
 export function generateRequestId() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -151,6 +155,8 @@ export function buildValidatePaymentPayload({
   primaryFieldName,
   requestId = generateRequestId(),
   billReferenceNumber,
+  payUsingReferenceNumber = false,
+  selectedAddon = null,
 }) {
   const resolvedCustomer = resolveCustomerDetailsForVas(customerDetails);
   const creditParty = buildCreditPartySection({
@@ -174,10 +180,16 @@ export function buildValidatePaymentPayload({
     },
     ProductId: product?.Id || product?.id,
     Quantity: 1,
+    PayUsingReferenceNumber: Boolean(payUsingReferenceNumber),
   };
 
   if (billReferenceNumber) {
     payload.BillReferenceNumber = billReferenceNumber;
+  }
+
+  const addOns = buildSelectedProductAddOns(selectedAddon);
+  if (addOns) {
+    payload.ProductAddOns = addOns;
   }
 
   return payload;
@@ -194,6 +206,8 @@ export function buildPostPaymentPayload({
   bankReference,
   requestId,
   primaryFieldName,
+  payUsingReferenceNumber = false,
+  selectedAddon = null,
 }) {
   const fulfillmentValidation = validationData || {};
   const resolvedRequestId =
@@ -238,8 +252,9 @@ export function buildPostPaymentPayload({
   };
 
   const paymentReference = bankReference || `BP-${Date.now()}`;
+  const fallbackAmount = typeof amount === 'number' ? amount : Number(amount) || 0;
 
-  return {
+  const payload = {
     RequestId: resolvedRequestId,
     ProductId: product?.Id || product?.id,
     BillReferenceNumber:
@@ -250,11 +265,19 @@ export function buildPostPaymentPayload({
     PaymentReferenceNumber: paymentReference,
     Quantity: 1,
     Currency: currencyCode,
-    Amount: typeof amount === 'number' ? amount : Number(amount) || 0,
+    Amount: resolveVasPostAmount(fulfillmentValidation, fallbackAmount),
     CustomerDetails: resolvedCustomer,
     ...creditParty,
     POSDetails: posDetails,
+    PayUsingReferenceNumber: Boolean(payUsingReferenceNumber),
   };
+
+  const addOns = buildSelectedProductAddOns(selectedAddon);
+  if (addOns) {
+    payload.ProductAddOns = addOns;
+  }
+
+  return payload;
 }
 
 export function mapVasPaymentToUiResult(response, requestId) {

@@ -12,6 +12,7 @@ import {
   resolveCustomerDetailsForVas,
 } from './vas/billPaymentPayload.js';
 import { productRequiresValidation } from '../utils/productValidation.js';
+import { resolveDebitAmount } from '../utils/billExtras.js';
 
 class BankPaymentService {
   constructor() {
@@ -146,6 +147,8 @@ class BankPaymentService {
       notifyNumber: paymentData.notifyNumber,
       customerDetails,
       primaryFieldName: paymentData.primaryFieldName,
+      payUsingReferenceNumber: paymentData.payUsingReferenceNumber,
+      selectedAddon: paymentData.selectedAddon,
     });
 
     const result = await validateBillPayment(payload);
@@ -193,6 +196,8 @@ class BankPaymentService {
       validationData: fulfillmentValidation,
       bankReference,
       primaryFieldName: paymentData.primaryFieldName,
+      payUsingReferenceNumber: paymentData.payUsingReferenceNumber,
+      selectedAddon: paymentData.selectedAddon,
     });
 
     console.log('📤 VAS PostPayment (bill):', payload);
@@ -248,7 +253,8 @@ class BankPaymentService {
       const reference = this.generateReference();
 
       // Prepare transfer data — bank debit uses account currency; VAS uses product currency.
-      const amount = parseFloat(paymentData.amount);
+      // Debit TotalAmount when charges exist; VAS PostPayment uses PrincipalAmount separately.
+      const amount = resolveDebitAmount(validationData, paymentData.amount);
       const vasCurrency = (paymentData.currency || this.defaultCurrency).toString().toUpperCase();
       const bankCurrency = (
         paymentData.bankCurrency ||

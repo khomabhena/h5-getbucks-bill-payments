@@ -17,10 +17,22 @@ import {
 } from '../utils/creditPartyIdentifiers';
 import { productRequiresValidation } from '../utils/productValidation';
 import { getServiceIconName } from '../utils/serviceIcons';
+import {
+  buildSelectedProductAddOns,
+  getChargeBreakdown,
+  getProductAddOns,
+  resolveValidateAmount,
+  shouldDisplayCharges,
+  supportsDstvAddOns,
+  supportsPayUsingReferenceNumber,
+} from '../utils/billExtras';
 
 /** Bill amount from VAS, or payment field for variable-amount products. */
 function resolveDisplayBillAmount(validationData, amount, isFixedAmount) {
   if (!validationData || validationData.Status !== 'VALIDATED') return null;
+
+  const calc = getChargeBreakdown(validationData);
+  if (calc && calc.totalAmount > 0) return calc.totalAmount;
 
   const apiAmount = validationData.BillAmount;
   const entered = parseFloat(amount);
@@ -39,6 +51,8 @@ const AccountInput = () => {
   const [accountValue, setAccountValue] = useState('');
   const [notifyNumber, setNotifyNumber] = useState('');
   const [amount, setAmount] = useState('');
+  const [selectedAddonCode, setSelectedAddonCode] = useState('');
+  const [payUsingReferenceNumber, setPayUsingReferenceNumber] = useState(false);
   const [validationData, setValidationData] = useState(null);
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState(null);
@@ -50,6 +64,13 @@ const AccountInput = () => {
 
   const showNotifyField = productRequiresNotifyNumber(product);
   const validationRequired = productRequiresValidation(product);
+  const showAddOns = supportsDstvAddOns(product);
+  const productAddOns = getProductAddOns(product);
+  const showReferenceToggle = supportsPayUsingReferenceNumber(product);
+  const selectedAddon =
+    showAddOns && selectedAddonCode
+      ? productAddOns.find((addon) => addon.Code === selectedAddonCode) || null
+      : null;
 
   // Calculate if amount is fixed
   const minAmount = product?.MinimumAmount || product?.MinAmount || 0;
@@ -64,15 +85,21 @@ const AccountInput = () => {
   const isFixedAmount = productPrice > 0 || amountsEqual;
   const fixedAmount = isFixedAmount ? (productPrice > 0 ? productPrice : minAmount) : null;
 
-  // Set fixed amount on mount
+  // Set fixed amount on mount / when add-on changes (amount includes selected add-on)
   useEffect(() => {
     if (product) {
-      if (isFixedAmount && fixedAmount) {
-        setAmount(fixedAmount.toString());
-      } else if (minAmount > 0) {
+      if (isFixedAmount && fixedAmount != null) {
+        setAmount(resolveValidateAmount(fixedAmount, selectedAddon).toString());
+      } else if (minAmount > 0 && !selectedAddonCode) {
         setAmount(minAmount.toString());
       }
     }
+  }, [product?.Id, selectedAddonCode]);
+
+  // Reset add-on / reference mode when product changes
+  useEffect(() => {
+    setSelectedAddonCode('');
+    setPayUsingReferenceNumber(false);
   }, [product?.Id]);
 
   // Redirect if no product selected
@@ -84,7 +111,7 @@ const AccountInput = () => {
 
   // Get credit party identifier info from product
   const creditPartyIdentifier = product?.CreditPartyIdentifiers?.[0];
-  const fieldLabel = getDisplayIdentifierLabel(
+  const baseFieldLabel = getDisplayIdentifierLabel(
     creditPartyIdentifier?.Title,
     {
       serviceName: service?.Name,
@@ -92,6 +119,7 @@ const AccountInput = () => {
       productName: product?.Name || product?.name
     }
   );
+  const fieldLabel = payUsingReferenceNumber ? 'Reference number' : baseFieldLabel;
   const fieldName = getFieldName(creditPartyIdentifier);
   const primaryFieldName = fieldName;
   const minAccountLength = getMinIdentifierLength(fieldLabel, fieldName);
@@ -116,10 +144,12 @@ const AccountInput = () => {
     };
   }, []);
 
-  // Refs for validation payload (account, notify number, amount)
+  // Refs for validation payload (account, notify number, amount, addon, reference mode)
   const amountRef = useRef(amount);
   const accountValueRef = useRef(accountValue);
   const notifyNumberRef = useRef(notifyNumber);
+  const selectedAddonRef = useRef(selectedAddon);
+  const payUsingReferenceNumberRef = useRef(payUsingReferenceNumber);
   
   useEffect(() => {
     amountRef.current = amount;
@@ -132,6 +162,14 @@ const AccountInput = () => {
   useEffect(() => {
     notifyNumberRef.current = notifyNumber;
   }, [notifyNumber]);
+
+  useEffect(() => {
+    selectedAddonRef.current = selectedAddon;
+  }, [selectedAddon]);
+
+  useEffect(() => {
+    payUsingReferenceNumberRef.current = payUsingReferenceNumber;
+  }, [payUsingReferenceNumber]);
 
   const performValidation = useCallback(async () => {
     if (!validationRequired) {
@@ -185,7 +223,13 @@ const AccountInput = () => {
         },
         ProductId: product.Id || product.id,
         Quantity: 1,
+        PayUsingReferenceNumber: Boolean(payUsingReferenceNumberRef.current),
       };
+
+      const addOns = buildSelectedProductAddOns(selectedAddonRef.current);
+      if (addOns) {
+        validationPayload.ProductAddOns = addOns;
+      }
 
       console.log('Validating payment with payload:', validationPayload);
 
@@ -303,7 +347,7 @@ const AccountInput = () => {
         clearTimeout(validationTimeoutRef.current);
       }
     };
-  }, [accountValue, notifyNumber, amount, performValidation, minAccountLength, validationRequired]);
+  }, [accountValue, notifyNumber, amount, selectedAddonCode, payUsingReferenceNumber, performValidation, minAccountLength, validationRequired]);
 
   const handleContinue = () => {
     const amountValue = parseFloat(amount);
@@ -320,6 +364,8 @@ const AccountInput = () => {
           primaryFieldName,
           notifyNumber: notifyNumber.trim() || null,
           amount: amountValue,
+          selectedAddon: selectedAddon || null,
+          payUsingReferenceNumber: Boolean(payUsingReferenceNumber),
           validationData: validationData
             ? { ...validationData, BillAmount: billAmount ?? validationData.BillAmount }
             : null,
@@ -339,6 +385,12 @@ const AccountInput = () => {
   const isAccountCompleteEnough = trimmedAccount.length >= minAccountLength;
   const isValidationSuccessful = validationData && validationData.Status === 'VALIDATED';
   const displayBillAmount = resolveDisplayBillAmount(validationData, amount, isFixedAmount);
+  const chargeBreakdown = getChargeBreakdown(validationData);
+  const showCharges = shouldDisplayCharges(product, validationData);
+  const paymentAmountDisplay =
+    showCharges && chargeBreakdown?.totalAmount > 0
+      ? String(chargeBreakdown.totalAmount)
+      : amount;
   const hasValidationFailed =
     validationRequired &&
     isAccountCompleteEnough &&
@@ -377,6 +429,71 @@ const AccountInput = () => {
               </div>
             </Card>
           </div>
+
+          {showReferenceToggle && (
+            <Card className="mb-4">
+              <p className="text-sm font-medium text-gray-800 mb-3">How are you paying?</p>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="payMode"
+                    checked={!payUsingReferenceNumber}
+                    onChange={() => setPayUsingReferenceNumber(false)}
+                  />
+                  Account / membership number
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="payMode"
+                    checked={payUsingReferenceNumber}
+                    onChange={() => setPayUsingReferenceNumber(true)}
+                  />
+                  Reference number
+                </label>
+              </div>
+            </Card>
+          )}
+
+          {showAddOns && (
+            <Card className="mb-4">
+              <p className="text-sm font-medium text-gray-800 mb-1">Optional add-on</p>
+              <p className="text-xs text-gray-500 mb-3">Choose none or one add-on</p>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between gap-2 text-sm text-gray-700 p-2 rounded border border-gray-200">
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="dstvAddon"
+                      checked={!selectedAddonCode}
+                      onChange={() => setSelectedAddonCode('')}
+                    />
+                    No add-on
+                  </span>
+                </label>
+                {productAddOns.map((addon) => (
+                  <label
+                    key={addon.Code}
+                    className="flex items-center justify-between gap-2 text-sm text-gray-700 p-2 rounded border border-gray-200"
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="radio"
+                        name="dstvAddon"
+                        checked={selectedAddonCode === addon.Code}
+                        onChange={() => setSelectedAddonCode(addon.Code)}
+                      />
+                      <span className="truncate">{addon.Name}</span>
+                    </span>
+                    <span className="flex-shrink-0 font-medium">
+                      {currency} {Number(addon.Price || 0).toFixed(2)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Account Input Field */}
           <Card className="mb-4">
@@ -443,36 +560,109 @@ const AccountInput = () => {
 
               {/* Bill Amount — VAS response or payment amount for variable products */}
               {displayBillAmount !== null && (
-                <div className="mt-3 pt-3 border-t border-green-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-medium text-gray-600">Bill Amount:</span>
-                    <span className="text-sm font-semibold text-green-700">
-                      {currency} {displayBillAmount.toFixed(2)}
-                    </span>
-                  </div>
+                <div className="mt-3 pt-3 border-t border-green-200 space-y-2">
+                  {showCharges && chargeBreakdown ? (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-gray-600">Principal:</span>
+                        <span className="text-sm text-gray-800">
+                          {currency} {chargeBreakdown.principalAmount.toFixed(2)}
+                        </span>
+                      </div>
+                      {chargeBreakdown.billerCharge > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-medium text-gray-600">Biller charge:</span>
+                          <span className="text-sm text-gray-800">
+                            {currency} {chargeBreakdown.billerCharge.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {chargeBreakdown.taxCharge > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-medium text-gray-600">Tax:</span>
+                          <span className="text-sm text-gray-800">
+                            {currency} {chargeBreakdown.taxCharge.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-gray-600">Total amount:</span>
+                        <span className="text-sm font-semibold text-green-700">
+                          {currency} {chargeBreakdown.totalAmount.toFixed(2)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium text-gray-600">Bill Amount:</span>
+                      <span className="text-sm font-semibold text-green-700">
+                        {currency} {displayBillAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
           )}
 
-          {/* Amount Input Field */}
+          {/* Show charges even when DisplayData is empty but calculations exist */}
+          {validationRequired &&
+            isValidationSuccessful &&
+            showCharges &&
+            chargeBreakdown &&
+            !(validationData?.DisplayData?.length > 0) && (
+              <Card className="mb-4" style={{ backgroundColor: colors.state.successLight, borderColor: colors.state.success }}>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-gray-600">Principal:</span>
+                    <span className="text-sm text-gray-800">
+                      {currency} {chargeBreakdown.principalAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  {chargeBreakdown.billerCharge > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium text-gray-600">Biller charge:</span>
+                      <span className="text-sm text-gray-800">
+                        {currency} {chargeBreakdown.billerCharge.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {chargeBreakdown.taxCharge > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium text-gray-600">Tax:</span>
+                      <span className="text-sm text-gray-800">
+                        {currency} {chargeBreakdown.taxCharge.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-gray-600">Total amount:</span>
+                    <span className="text-sm font-semibold text-green-700">
+                      {currency} {chargeBreakdown.totalAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+          {/* Amount Input Field — show TotalAmount when charges apply (what customer pays) */}
           <Card className="mb-4">
             <InputField
               type="number"
               label="Payment Amount"
               placeholder={isFixedAmount ? "Fixed amount" : `Enter amount (${currency})`}
-              value={amount}
+              value={paymentAmountDisplay}
               onChange={(e) => {
-                if (!isFixedAmount) {
+                if (!isFixedAmount && !showCharges) {
                   setAmount(e.target.value);
                 }
               }}
-              disabled={isFixedAmount}
+              disabled={isFixedAmount || showCharges}
               required
             />
             
             {/* Amount limits display */}
-            {(minAmount > 0 || maxAmount > 0) && (
+            {!showCharges && (minAmount > 0 || maxAmount > 0) && (
               <div className="mt-2 text-xs text-gray-500">
                 {minAmount > 0 && maxAmount > 0 && Math.abs(minAmount - maxAmount) < 0.01 && (
                   <span>Amount: {currency} {minAmount.toFixed(2)}</span>
@@ -489,10 +679,17 @@ const AccountInput = () => {
               </div>
             )}
             
-            {isFixedAmount && productPrice > 0 && (
+            {showCharges && chargeBreakdown ? (
               <div className="mt-2 text-xs text-gray-500">
-                Fixed amount for this product
+                You will be charged the total ({currency} {chargeBreakdown.totalAmount.toFixed(2)}).
+                Principal {currency} {chargeBreakdown.principalAmount.toFixed(2)} is sent to the biller.
               </div>
+            ) : (
+              isFixedAmount && productPrice > 0 && (
+                <div className="mt-2 text-xs text-gray-500">
+                  Fixed amount for this product
+                </div>
+              )
             )}
           </Card>
 
