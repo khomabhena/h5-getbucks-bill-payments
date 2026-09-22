@@ -35,7 +35,7 @@ const SelectionButton = ({
         ${className}
       `}
     >
-      <div className={`flex ${icon ? 'flex-row items-center' : iconName ? 'flex-col items-center' : 'flex-row items-center'} ${icon ? 'space-x-2' : iconName ? 'space-y-2' : ''}`}>
+      <div className={`flex w-full min-w-0 ${icon ? 'flex-col items-center space-y-2' : iconName ? 'flex-col items-center space-y-2' : 'flex-row items-center'}`}>
         {icon && (
           <div className={`flex-shrink-0 ${selected ? 'text-[#faa819]' : 'text-gray-600'}`}>
             {icon}
@@ -48,7 +48,7 @@ const SelectionButton = ({
             className={selected ? 'text-[#faa819]' : 'text-gray-600'}
           />
         )}
-        <span className={`font-semibold ${icon ? 'text-left' : 'text-center'} ${selected ? 'text-[#faa819]' : 'text-gray-700'} ${icon ? 'flex-1' : ''}`}>
+        <span className={`font-semibold w-full min-w-0 text-center whitespace-normal break-words leading-snug ${selected ? 'text-[#faa819]' : 'text-gray-700'}`}>
           {children}
         </span>
       </div>

@@ -165,9 +165,12 @@ const ProviderSelection = () => {
                       onClick={() => handleProviderSelect(provider)}
                       selected={!!isSelected}
                       size="md"
+                      className="h-full min-h-[96px] min-w-0"
                       iconName={getServiceIconName(provider.Name || provider.name)}
                     >
-                      <span className="text-xs leading-tight">{provider.Name || provider.name || 'Provider'}</span>
+                      <span className="text-xs leading-snug whitespace-normal break-words">
+                        {provider.Name || provider.name || 'Provider'}
+                      </span>
                     </SelectionButton>
                   );
                 })}
