@@ -15,7 +15,7 @@ import {
   getFieldName,
   productRequiresNotifyNumber,
 } from '../utils/creditPartyIdentifiers';
-import { productRequiresValidation } from '../utils/productValidation';
+import { formatValidationMessage, productRequiresValidation } from '../utils/productValidation';
 import { getServiceIconName } from '../utils/serviceIcons';
 import {
   buildSelectedProductAddOns,
@@ -56,10 +56,7 @@ const AccountInput = () => {
   const [validationData, setValidationData] = useState(null);
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState(null);
-  const validationTimeoutRef = useRef(null);
   const currentValidationRequestRef = useRef(null);
-  const accountInputRef = useRef(null);
-  const cursorPositionRef = useRef(null);
   const customerDetailsRef = useRef(resolveCustomerDetailsForVas());
 
   const showNotifyField = productRequiresNotifyNumber(product);
@@ -241,7 +238,7 @@ const AccountInput = () => {
           setValidationError(null);
         } else {
           setValidationError(
-            result.data?.ResultMessage || result.error || 'Failed to validate account details.'
+            formatValidationMessage(result.data?.ResultMessage || result.error, currentAccountValue)
           );
           setValidationData(null);
         }
@@ -262,7 +259,7 @@ const AccountInput = () => {
             error?.responseData?.details?.errors?.['CustomerDetails.EmailAddress']?.[0] ||
             error?.responseData?.ResultMessage ||
             error?.message;
-          setValidationError(resultMessage || 'Failed to validate account details.');
+          setValidationError(formatValidationMessage(resultMessage, currentAccountValue));
         }
         
         setValidationData(null);
@@ -271,83 +268,13 @@ const AccountInput = () => {
     }
   }, [product, currency, minAccountLength, validationRequired, primaryFieldName]);
 
-  // Track if input was focused before validation
-  const wasFocusedRef = useRef(false);
-  const validatingRef = useRef(validating);
-  
-  // Keep validating ref in sync
+  // Any change to the validated inputs invalidates the previous result; the user re-validates via the button.
   useEffect(() => {
-    validatingRef.current = validating;
-  }, [validating]);
-  
-  // Save focus state and cursor position when typing
-  const handleAccountInputFocus = () => {
-    wasFocusedRef.current = true;
-  };
-  
-  const handleAccountInputBlur = () => {
-    if (!validatingRef.current) {
-      wasFocusedRef.current = false;
-    }
-
-    const trimmed = accountValueRef.current.trim();
-    if (trimmed.length >= minAccountLength) {
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current);
-      }
-      performValidation();
-    }
-  };
-
-  // Restore focus and cursor position after validation completes
-  useEffect(() => {
-    // Only restore focus when validation completes (not during validation)
-    if (!validating && wasFocusedRef.current && accountInputRef.current && cursorPositionRef.current !== null) {
-      // Use requestAnimationFrame to ensure DOM is updated
-      requestAnimationFrame(() => {
-        if (accountInputRef.current) {
-          accountInputRef.current.focus();
-          const position = cursorPositionRef.current;
-          if (position !== null && position <= accountValue.length) {
-            accountInputRef.current.setSelectionRange(position, position);
-          }
-        }
-      });
-    }
-  }, [validating, accountValue.length]);
-
-  // Debounced validation when account, notify number, or payment amount changes
-  useEffect(() => {
-    if (!validationRequired) {
-      setValidationData(null);
-      setValidationError(null);
-      setValidating(false);
-      return;
-    }
-
-    if (validationTimeoutRef.current) {
-      clearTimeout(validationTimeoutRef.current);
-    }
-
-    const trimmedLength = accountValue.trim().length;
-
-    if (trimmedLength >= minAccountLength) {
-      validationTimeoutRef.current = setTimeout(() => {
-        performValidation();
-      }, 1500);
-    } else {
-      setValidationData(null);
-      setValidationError(null);
-      setValidating(false);
-      currentValidationRequestRef.current = null;
-    }
-
-    return () => {
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current);
-      }
-    };
-  }, [accountValue, notifyNumber, amount, selectedAddonCode, payUsingReferenceNumber, performValidation, minAccountLength, validationRequired]);
+    currentValidationRequestRef.current = null;
+    setValidationData(null);
+    setValidationError(null);
+    setValidating(false);
+  }, [accountValue, notifyNumber, amount, selectedAddonCode, payUsingReferenceNumber]);
 
   const handleContinue = () => {
     const amountValue = parseFloat(amount);
@@ -397,7 +324,10 @@ const AccountInput = () => {
     !validating &&
     !isValidationSuccessful &&
     validationError;
-  const canContinue = hasValidAccount && hasValidAmount;
+  // Validation must have been attempted (success or failure) before continuing; a failure can still proceed.
+  const hasAttemptedValidation = isValidationSuccessful || Boolean(hasValidationFailed);
+  const canContinue =
+    hasValidAccount && hasValidAmount && !validating && (!validationRequired || hasAttemptedValidation);
 
   return (
     <PageWrapper>
@@ -498,26 +428,54 @@ const AccountInput = () => {
           {/* Account Input Field */}
           <Card className="mb-4">
             <InputField
-              ref={accountInputRef}
               type="text"
               label={fieldLabel}
               placeholder={`Enter ${fieldLabel.toLowerCase()}`}
               value={accountValue}
-              onChange={(e) => {
-                cursorPositionRef.current = e.target.selectionStart;
-                setAccountValue(e.target.value);
-              }}
-              onFocus={handleAccountInputFocus}
-              onBlur={handleAccountInputBlur}
-              error={hasValidationFailed ? validationError : null}
+              onChange={(e) => setAccountValue(e.target.value)}
               loading={validating}
               required
             />
-            
-            {validationRequired && validating && (
-              <div className="mt-2 flex items-center text-xs text-gray-500">
-                <Icon name="refresh" size={16} className="text-[#faa819] animate-spin mr-2" />
-                Validating account...
+
+            {validationRequired && (
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  fullWidth
+                  onClick={performValidation}
+                  disabled={!isAccountCompleteEnough || validating || isValidationSuccessful}
+                >
+                  {validating ? (
+                    <span className="flex items-center justify-center">
+                      <Icon name="refresh" size={16} className="animate-spin mr-2" />
+                      Validating...
+                    </span>
+                  ) : isValidationSuccessful ? (
+                    'Validated'
+                  ) : (
+                    `Validate ${fieldLabel.toLowerCase()}`
+                  )}
+                </Button>
+                {!isValidationSuccessful && !hasValidationFailed && !validating && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Validate your details to see the account name and amount due.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {hasValidationFailed && (
+              <div className="mt-3 rounded-lg p-3 bg-red-50 border border-red-200">
+                <div className="flex items-start space-x-2">
+                  <Icon name="error" size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-red-800">
+                      We couldn't verify this {fieldLabel.toLowerCase()}
+                    </p>
+                    <p className="mt-0.5 text-sm text-red-700 break-words">{validationError}</p>
+                  </div>
+                </div>
               </div>
             )}
           </Card>
