@@ -52,6 +52,18 @@ export function shouldDisplayCharges(product, validationData) {
   );
 }
 
+/**
+ * Bill amount the user is paying. When VAS returned charges, its PrincipalAmount wins
+ * (the amount field is locked then, and may be blank for billers like Nyaradzo that quote the amount).
+ */
+export function resolveEffectiveAmount(product, validationData, enteredAmount) {
+  if (shouldDisplayCharges(product, validationData)) {
+    const principal = getChargeBreakdown(validationData)?.principalAmount;
+    if (principal > 0) return principal;
+  }
+  return parseFloat(enteredAmount);
+}
+
 /** Amount to debit from customer (bank / SuperApp) — TotalAmount when present. */
 export function resolveDebitAmount(validationData, fallbackAmount) {
   const breakdown = getChargeBreakdown(validationData);

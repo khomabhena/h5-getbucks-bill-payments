@@ -21,6 +21,7 @@ import {
   buildSelectedProductAddOns,
   getChargeBreakdown,
   getProductAddOns,
+  resolveEffectiveAmount,
   resolveValidateAmount,
   shouldDisplayCharges,
   supportsDstvAddOns,
@@ -277,7 +278,7 @@ const AccountInput = () => {
   }, [accountValue, notifyNumber, amount, selectedAddonCode, payUsingReferenceNumber]);
 
   const handleContinue = () => {
-    const amountValue = parseFloat(amount);
+    const amountValue = resolveEffectiveAmount(product, validationData, amount);
     const billAmount = resolveDisplayBillAmount(validationData, amount, isFixedAmount);
 
     if (product && country && service && provider) {
@@ -305,8 +306,8 @@ const AccountInput = () => {
     return null;
   }
 
-  const amountValue = parseFloat(amount);
-  const hasValidAmount = amount && !isNaN(amountValue) && amountValue > 0;
+  const amountValue = resolveEffectiveAmount(product, validationData, amount);
+  const hasValidAmount = !isNaN(amountValue) && amountValue > 0;
   const trimmedAccount = accountValue.trim();
   const hasValidAccount = trimmedAccount.length > 0;
   const isAccountCompleteEnough = trimmedAccount.length >= minAccountLength;
