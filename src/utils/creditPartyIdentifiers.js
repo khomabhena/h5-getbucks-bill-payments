@@ -1,7 +1,10 @@
 /**
  * Build CreditPartyIdentifiers for VAS ValidatePayment / PostPayment.
- * Products may require multiple identifiers (e.g. AccountNumber + NotifyNumber for ZESA).
+ * Products may require multiple identifiers (e.g. AccountNumber + NotifyNumber for ZESA,
+ * or student details for universities / schools).
  */
+
+import { getExtraIdentifierNames } from './billIdentifierFields.js';
 
 export function getFieldName(identifier = {}) {
   return (
@@ -208,6 +211,10 @@ export function buildPaymentRecipient({
   return recipient;
 }
 
+/**
+ * @param {Object} [params.extraValues] - Values for extra catalog fields keyed by field name
+ * @param {'validate'|'post'} [params.stage] - 'validate' omits extra fields (VAS validates the account only)
+ */
 export function buildCreditPartyIdentifiers({
   product,
   accountValue,
@@ -215,6 +222,8 @@ export function buildCreditPartyIdentifiers({
   notifyNumber,
   overrides = {},
   primaryFieldName,
+  extraValues = {},
+  stage = 'post',
 }) {
   const catalogIdentifiers = product?.CreditPartyIdentifiers;
   const mobileNumber = resolveNotifyNumber({ notifyNumber, overrides, customerDetails });
@@ -269,11 +278,21 @@ export function buildCreditPartyIdentifiers({
     return entries.filter((entry) => entry.IdentifierFieldValue);
   }
 
+  const extraNames = getExtraIdentifierNames(product);
+  const extraValueFor = (fieldName) => String(extraValues?.[fieldName] ?? '').trim();
+
   const entries = catalogIdentifiers
-    .filter((identifier) => identifier.Required !== false)
+    .filter((identifier) => {
+      const fieldName = getFieldName(identifier);
+      if (extraNames.has(fieldName)) {
+        if (stage === 'validate') return false;
+        return identifier.Required !== false || Boolean(extraValueFor(fieldName));
+      }
+      return identifier.Required !== false;
+    })
     .map((identifier) => {
       const fieldName = getFieldName(identifier);
-      const value = resolveValue(fieldName);
+      const value = extraNames.has(fieldName) ? extraValueFor(fieldName) : resolveValue(fieldName);
       return {
         IdentifierFieldName: fieldName,
         IdentifierFieldValue: value,

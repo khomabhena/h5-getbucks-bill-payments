@@ -16,17 +16,25 @@ import {
   productRequiresNotifyNumber,
 } from '../utils/creditPartyIdentifiers';
 import { formatValidationMessage, productRequiresValidation } from '../utils/productValidation';
+import {
+  cleanExtraValues,
+  getExtraFieldErrors,
+  getExtraIdentifierFields,
+  getPaymentCodeConfig,
+  getStudentNameFromValidation,
+} from '../utils/billIdentifierFields';
 import { getServiceIconName } from '../utils/serviceIcons';
 import {
   buildSelectedProductAddOns,
   getChargeBreakdown,
   getProductAddOns,
-  resolveEffectiveAmount,
   resolveValidateAmount,
+  resolveValidationAmount,
   shouldDisplayCharges,
   supportsDstvAddOns,
   supportsPayUsingReferenceNumber,
 } from '../utils/billExtras';
+import { getBillerDetailRows } from '../utils/billerDetails';
 
 /** Bill amount from VAS, or payment field for variable-amount products. */
 function resolveDisplayBillAmount(validationData, amount, isFixedAmount) {
@@ -44,10 +52,36 @@ function resolveDisplayBillAmount(validationData, amount, isFixedAmount) {
   return null;
 }
 
+function getValidationErrorMessage(error, accountValue) {
+  if (error?.userMessage) return error.userMessage;
+
+  const isNetworkError =
+    error?.message?.includes('Failed to fetch') ||
+    error?.message?.includes('NetworkError') ||
+    error?.name === 'TypeError';
+
+  if (isNetworkError) {
+    return 'Network connection issue. Please check your internet connection and try again.';
+  }
+
+  const resultMessage =
+    error?.responseData?.details?.errors?.['CustomerDetails.EmailAddress']?.[0] ||
+    error?.responseData?.ResultMessage ||
+    error?.message;
+  return formatValidationMessage(resultMessage, accountValue);
+}
+
 const AccountInput = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { country, service, provider, product } = location.state || {};
+  const { country, service, provider, product: initialProduct, packageOptions } =
+    location.state || {};
+  // DSTV: smartcard is validated first, then the customer picks a package (each package is a product).
+  const isPackageFlow = Array.isArray(packageOptions) && packageOptions.length > 1;
+  const [selectedPackageId, setSelectedPackageId] = useState(null);
+  const product =
+    (isPackageFlow && packageOptions.find((option) => option.Id === selectedPackageId)) ||
+    initialProduct;
 
   const [accountValue, setAccountValue] = useState('');
   const [notifyNumber, setNotifyNumber] = useState('');
@@ -57,6 +91,12 @@ const AccountInput = () => {
   const [validationData, setValidationData] = useState(null);
   const [validating, setValidating] = useState(false);
   const [validationError, setValidationError] = useState(null);
+  const [extraValues, setExtraValues] = useState({});
+  const [paymentCode, setPaymentCode] = useState('');
+  // Product / amount / add-on the current validationData was quoted for (charges depend on them).
+  const [validatedQuote, setValidatedQuote] = useState(null);
+  const [confirmingAmount, setConfirmingAmount] = useState(false);
+  const [quoteError, setQuoteError] = useState(null);
   const currentValidationRequestRef = useRef(null);
   const customerDetailsRef = useRef(resolveCustomerDetailsForVas());
 
@@ -65,6 +105,8 @@ const AccountInput = () => {
   const showAddOns = supportsDstvAddOns(product);
   const productAddOns = getProductAddOns(product);
   const showReferenceToggle = supportsPayUsingReferenceNumber(product);
+  const extraFields = getExtraIdentifierFields(product);
+  const paymentCodeConfig = getPaymentCodeConfig(product);
   const selectedAddon =
     showAddOns && selectedAddonCode
       ? productAddOns.find((addon) => addon.Code === selectedAddonCode) || null
@@ -94,10 +136,12 @@ const AccountInput = () => {
     }
   }, [product?.Id, selectedAddonCode]);
 
-  // Reset add-on / reference mode when product changes
+  // Reset add-on / reference mode / student details when product changes
   useEffect(() => {
     setSelectedAddonCode('');
     setPayUsingReferenceNumber(false);
+    setExtraValues({});
+    setPaymentCode('');
   }, [product?.Id]);
 
   // Redirect if no product selected
@@ -148,6 +192,11 @@ const AccountInput = () => {
   const notifyNumberRef = useRef(notifyNumber);
   const selectedAddonRef = useRef(selectedAddon);
   const payUsingReferenceNumberRef = useRef(payUsingReferenceNumber);
+  const paymentCodeRef = useRef(paymentCode);
+
+  useEffect(() => {
+    paymentCodeRef.current = paymentCode;
+  }, [paymentCode]);
   
   useEffect(() => {
     amountRef.current = amount;
@@ -169,37 +218,20 @@ const AccountInput = () => {
     payUsingReferenceNumberRef.current = payUsingReferenceNumber;
   }, [payUsingReferenceNumber]);
 
-  const performValidation = useCallback(async () => {
-    if (!validationRequired) {
-      return;
-    }
-
-    const currentAccountValue = accountValueRef.current;
-    const currentAmount = amountRef.current;
-    
-    if (!currentAccountValue.trim() || !product) {
-      return;
-    }
-
-    if (currentAccountValue.trim().length < minAccountLength) {
-      return;
-    }
-
-    const requestId = generateRequestId();
-    currentValidationRequestRef.current = requestId;
-
-    setValidating(true);
-    setValidationError(null);
-
-    try {
-      const amountValue = parseFloat(currentAmount) || 0;
+  /**
+   * ValidatePayment for the current product / account at the given amount.
+   * Resolves to the VAS response; rejects with a user-facing message on failure.
+   */
+  const requestValidation = useCallback(
+    async (amountValue) => {
+      const accountTrimmed = accountValueRef.current.trim();
       const customerDetails = customerDetailsRef.current;
 
       const validationPayload = {
-        RequestId: requestId,
+        RequestId: generateRequestId(),
         Amount: amountValue,
         Recipient: buildPaymentRecipient({
-          accountValue: currentAccountValue.trim(),
+          accountValue: accountTrimmed,
           notifyNumber: notifyNumberRef.current,
           primaryFieldName,
           customerDetails,
@@ -207,10 +239,11 @@ const AccountInput = () => {
         }),
         CreditPartyIdentifiers: buildCreditPartyIdentifiers({
           product,
-          accountValue: currentAccountValue.trim(),
+          accountValue: accountTrimmed,
           customerDetails,
           notifyNumber: notifyNumberRef.current,
           primaryFieldName,
+          stage: 'validate',
         }),
         Currency: currency,
         CustomerDetails: customerDetails,
@@ -229,96 +262,186 @@ const AccountInput = () => {
         validationPayload.ProductAddOns = addOns;
       }
 
-      console.log('Validating payment with payload:', validationPayload);
+      if (paymentCodeRef.current) {
+        validationPayload.PaymentCode = paymentCodeRef.current;
+      }
 
+      console.log('Validating payment with payload:', validationPayload);
       const result = await appleTreeService.validatePayment(validationPayload);
 
-      if (currentValidationRequestRef.current === requestId) {
-        if (result.success && result.data?.Status === 'VALIDATED') {
-          setValidationData(result.data);
-          setValidationError(null);
-        } else {
-          setValidationError(
-            formatValidationMessage(result.data?.ResultMessage || result.error, currentAccountValue)
-          );
-          setValidationData(null);
-        }
-        setValidating(false);
+      if (result.success && result.data?.Status === 'VALIDATED') {
+        return result.data;
+      }
+
+      const upstreamMessage =
+        result.data?.ResultMessage ||
+        result.data?.details?.ResultMessage ||
+        result.data?.error ||
+        result.error;
+      throw Object.assign(new Error(upstreamMessage || 'Validation failed'), {
+        userMessage: formatValidationMessage(upstreamMessage, accountTrimmed),
+      });
+    },
+    [product, currency, primaryFieldName]
+  );
+
+  const performValidation = useCallback(async () => {
+    if (!validationRequired) {
+      return;
+    }
+
+    const currentAccountValue = accountValueRef.current;
+    if (!currentAccountValue.trim() || !product) {
+      return;
+    }
+
+    if (currentAccountValue.trim().length < minAccountLength) {
+      return;
+    }
+
+    // The customer may not have entered an amount yet; VAS rejects 0.
+    const amountValue = resolveValidationAmount(
+      product,
+      amountRef.current,
+      selectedAddonRef.current
+    );
+    const attemptId = generateRequestId();
+    currentValidationRequestRef.current = attemptId;
+
+    setValidating(true);
+    setValidationError(null);
+    setQuoteError(null);
+
+    try {
+      const data = await requestValidation(amountValue);
+      if (currentValidationRequestRef.current !== attemptId) return;
+
+      setValidationData(data);
+      setValidatedQuote({
+        productId: product.Id || product.id,
+        amount: amountValue,
+        addonCode: selectedAddonRef.current?.Code || '',
+      });
+
+      const suggestedName = getStudentNameFromValidation(data);
+      const hasStudentNameField = getExtraIdentifierFields(product).some(
+        (field) => field.name === 'StudentName'
+      );
+      if (suggestedName && hasStudentNameField) {
+        setExtraValues((prev) =>
+          prev.StudentName?.trim() ? prev : { ...prev, StudentName: suggestedName }
+        );
       }
     } catch (error) {
       console.error('Validation error:', error);
-      
-      if (currentValidationRequestRef.current === requestId) {
-        const isNetworkError = error.message?.includes('Failed to fetch') ||
-                              error.message?.includes('NetworkError') ||
-                              error.name === 'TypeError';
+      if (currentValidationRequestRef.current !== attemptId) return;
 
-        if (isNetworkError) {
-          setValidationError('Network connection issue. Please check your internet connection and try again.');
-        } else {
-          const resultMessage =
-            error?.responseData?.details?.errors?.['CustomerDetails.EmailAddress']?.[0] ||
-            error?.responseData?.ResultMessage ||
-            error?.message;
-          setValidationError(formatValidationMessage(resultMessage, currentAccountValue));
-        }
-        
-        setValidationData(null);
+      setValidationError(getValidationErrorMessage(error, currentAccountValue));
+      setValidationData(null);
+      setValidatedQuote(null);
+    } finally {
+      if (currentValidationRequestRef.current === attemptId) {
         setValidating(false);
       }
     }
-  }, [product, currency, minAccountLength, validationRequired, primaryFieldName]);
+  }, [product, minAccountLength, validationRequired, requestValidation]);
 
-  // Any change to the validated inputs invalidates the previous result; the user re-validates via the button.
+  // A different account invalidates the previous result; the user re-validates via the button.
+  // Amount / package / add-on changes keep the account validation and are re-quoted on Continue.
   useEffect(() => {
     currentValidationRequestRef.current = null;
     setValidationData(null);
+    setValidatedQuote(null);
     setValidationError(null);
+    setQuoteError(null);
     setValidating(false);
-  }, [accountValue, notifyNumber, amount, selectedAddonCode, payUsingReferenceNumber]);
+  }, [accountValue, notifyNumber, payUsingReferenceNumber, paymentCode]);
 
-  const handleContinue = () => {
-    const amountValue = resolveEffectiveAmount(product, validationData, amount);
-    const billAmount = resolveDisplayBillAmount(validationData, amount, isFixedAmount);
+  useEffect(() => {
+    setQuoteError(null);
+  }, [amount, selectedAddonCode, selectedPackageId]);
 
-    if (product && country && service && provider) {
-      navigate(ROUTES.PAYMENT, {
-        state: {
-          country,
-          service,
-          provider,
-          product,
-          accountValue,
-          primaryFieldName,
-          notifyNumber: notifyNumber.trim() || null,
+  const handleExtraValueChange = (fieldName, value) => {
+    setExtraValues((prev) => ({ ...prev, [fieldName]: value }));
+  };
+
+  const handleContinue = async () => {
+    if (!product || !country || !service || !provider) return;
+
+    const amountValue = parseFloat(amount);
+    let finalValidation = validationData;
+
+    // Charges and the RequestId used by PostPayment must match the amount actually being paid.
+    if (validationRequired && isValidationSuccessful && !isQuoteCurrent) {
+      setConfirmingAmount(true);
+      setQuoteError(null);
+      try {
+        finalValidation = await requestValidation(amountValue);
+        setValidationData(finalValidation);
+        setValidatedQuote({
+          productId: product.Id || product.id,
           amount: amountValue,
-          selectedAddon: selectedAddon || null,
-          payUsingReferenceNumber: Boolean(payUsingReferenceNumber),
-          validationData: validationData
-            ? { ...validationData, BillAmount: billAmount ?? validationData.BillAmount }
-            : null,
-        },
-      });
+          addonCode: selectedAddonCode || '',
+        });
+      } catch (error) {
+        console.error('Amount confirmation error:', error);
+        setQuoteError(getValidationErrorMessage(error, accountValue));
+        return;
+      } finally {
+        setConfirmingAmount(false);
+      }
     }
+
+    const billAmount = resolveDisplayBillAmount(finalValidation, amount, isFixedAmount);
+
+    navigate(ROUTES.PAYMENT, {
+      state: {
+        country,
+        service,
+        provider,
+        product,
+        accountValue,
+        primaryFieldName,
+        notifyNumber: notifyNumber.trim() || null,
+        amount: amountValue,
+        selectedAddon: selectedAddon || null,
+        payUsingReferenceNumber: Boolean(payUsingReferenceNumber),
+        extraIdentifierValues: cleanExtraValues(extraFields, extraValues),
+        paymentCode: paymentCode || null,
+        validationData: finalValidation
+          ? { ...finalValidation, BillAmount: billAmount ?? finalValidation.BillAmount }
+          : null,
+      },
+    });
   };
 
   if (!product || !country || !service || !provider) {
     return null;
   }
 
-  const amountValue = resolveEffectiveAmount(product, validationData, amount);
-  const hasValidAmount = !isNaN(amountValue) && amountValue > 0;
+  const amountValue = parseFloat(amount);
+  const isAmountBelowMin = minAmount > 0 && amountValue < minAmount;
+  const isAmountAboveMax = maxAmount > 0 && amountValue > maxAmount;
+  const hasValidAmount =
+    amount && !isNaN(amountValue) && amountValue > 0 && !isAmountBelowMin && !isAmountAboveMax;
   const trimmedAccount = accountValue.trim();
   const hasValidAccount = trimmedAccount.length > 0;
   const isAccountCompleteEnough = trimmedAccount.length >= minAccountLength;
   const isValidationSuccessful = validationData && validationData.Status === 'VALIDATED';
-  const displayBillAmount = resolveDisplayBillAmount(validationData, amount, isFixedAmount);
-  const chargeBreakdown = getChargeBreakdown(validationData);
-  const showCharges = shouldDisplayCharges(product, validationData);
-  const paymentAmountDisplay =
-    showCharges && chargeBreakdown?.totalAmount > 0
-      ? String(chargeBreakdown.totalAmount)
-      : amount;
+  // validationData was quoted for this exact product / amount / add-on (otherwise re-quoted on Continue)
+  const isQuoteCurrent =
+    Boolean(validatedQuote) &&
+    validatedQuote.productId === (product.Id || product.id) &&
+    validatedQuote.addonCode === (selectedAddonCode || '') &&
+    Math.abs(validatedQuote.amount - amountValue) < 0.005;
+  const displayBillAmount = isQuoteCurrent
+    ? resolveDisplayBillAmount(validationData, amount, isFixedAmount)
+    : null;
+  const chargeBreakdown = isQuoteCurrent ? getChargeBreakdown(validationData) : null;
+  const showCharges = isQuoteCurrent && shouldDisplayCharges(product, validationData);
+  const billerDetailRows = getBillerDetailRows(validationData);
+  const showPackagePicker = isPackageFlow && isValidationSuccessful;
+  const awaitingPackage = isPackageFlow && !selectedPackageId;
   const hasValidationFailed =
     validationRequired &&
     isAccountCompleteEnough &&
@@ -327,8 +450,18 @@ const AccountInput = () => {
     validationError;
   // Validation must have been attempted (success or failure) before continuing; a failure can still proceed.
   const hasAttemptedValidation = isValidationSuccessful || Boolean(hasValidationFailed);
+  const extraFieldErrors = getExtraFieldErrors(extraFields, extraValues);
+  const hasExtraFieldErrors = Object.keys(extraFieldErrors).length > 0;
+  const paymentCodeMissing = Boolean(paymentCodeConfig?.required) && !paymentCode;
   const canContinue =
-    hasValidAccount && hasValidAmount && !validating && (!validationRequired || hasAttemptedValidation);
+    hasValidAccount &&
+    hasValidAmount &&
+    !validating &&
+    !confirmingAmount &&
+    !awaitingPackage &&
+    !paymentCodeMissing &&
+    !hasExtraFieldErrors &&
+    (!validationRequired || hasAttemptedValidation);
 
   return (
     <PageWrapper>
@@ -387,42 +520,25 @@ const AccountInput = () => {
             </Card>
           )}
 
-          {showAddOns && (
+          {paymentCodeConfig && (
             <Card className="mb-4">
-              <p className="text-sm font-medium text-gray-800 mb-1">Optional add-on</p>
-              <p className="text-xs text-gray-500 mb-3">Choose none or one add-on</p>
-              <div className="space-y-2">
-                <label className="flex items-center justify-between gap-2 text-sm text-gray-700 p-2 rounded border border-gray-200">
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="dstvAddon"
-                      checked={!selectedAddonCode}
-                      onChange={() => setSelectedAddonCode('')}
-                    />
-                    No add-on
-                  </span>
-                </label>
-                {productAddOns.map((addon) => (
-                  <label
-                    key={addon.Code}
-                    className="flex items-center justify-between gap-2 text-sm text-gray-700 p-2 rounded border border-gray-200"
-                  >
-                    <span className="flex items-center gap-2 min-w-0">
-                      <input
-                        type="radio"
-                        name="dstvAddon"
-                        checked={selectedAddonCode === addon.Code}
-                        onChange={() => setSelectedAddonCode(addon.Code)}
-                      />
-                      <span className="truncate">{addon.Name}</span>
-                    </span>
-                    <span className="flex-shrink-0 font-medium">
-                      {currency} {Number(addon.Price || 0).toFixed(2)}
-                    </span>
-                  </label>
+              <label htmlFor="paymentCode" className="block text-sm font-medium mb-2 text-gray-700">
+                Payment type
+                {paymentCodeConfig.required && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              <select
+                id="paymentCode"
+                value={paymentCode}
+                onChange={(e) => setPaymentCode(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border border-gray-200 bg-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-offset-1 focus:border-[#faa819] focus:ring-[#faa819]"
+              >
+                <option value="">Select payment type</option>
+                {paymentCodeConfig.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
-              </div>
+              </select>
             </Card>
           )}
 
@@ -445,7 +561,9 @@ const AccountInput = () => {
                   size="sm"
                   fullWidth
                   onClick={performValidation}
-                  disabled={!isAccountCompleteEnough || validating || isValidationSuccessful}
+                  disabled={
+                    !isAccountCompleteEnough || paymentCodeMissing || validating || isValidationSuccessful
+                  }
                 >
                   {validating ? (
                     <span className="flex items-center justify-center">
@@ -460,7 +578,9 @@ const AccountInput = () => {
                 </Button>
                 {!isValidationSuccessful && !hasValidationFailed && !validating && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Validate your details to see the account name and amount due.
+                    {paymentCodeMissing
+                      ? 'Select a payment type, then validate your details.'
+                      : 'Validate your details to see the account name and amount due.'}
                   </p>
                 )}
               </div>
@@ -481,6 +601,66 @@ const AccountInput = () => {
             )}
           </Card>
 
+          {extraFields.length > 0 && (
+            <Card className="mb-4">
+              <p className="text-sm font-semibold text-gray-800 mb-3">Student details</p>
+              <div className="space-y-4">
+                {extraFields.map((field) => {
+                  const value = extraValues[field.name] ?? '';
+                  const fieldError = String(value).trim() ? extraFieldErrors[field.name] : null;
+
+                  if (field.type === 'select') {
+                    return (
+                      <div key={field.name}>
+                        <label
+                          htmlFor={`extra-${field.name}`}
+                          className="block text-sm font-medium mb-2 text-gray-700"
+                        >
+                          {field.label}
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        <select
+                          id={`extra-${field.name}`}
+                          value={value}
+                          onChange={(e) => handleExtraValueChange(field.name, e.target.value)}
+                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border border-gray-200 bg-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-offset-1 focus:border-[#faa819] focus:ring-[#faa819]"
+                        >
+                          <option value="">Select {field.label.toLowerCase()}</option>
+                          {field.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={field.name}>
+                      <InputField
+                        type="text"
+                        label={field.required ? field.label : `${field.label} (optional)`}
+                        placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+                        value={value}
+                        onChange={(e) => handleExtraValueChange(field.name, e.target.value)}
+                        maxLength={field.maxLength || null}
+                        autoComplete={field.autoComplete}
+                        error={fieldError}
+                        required={field.required}
+                      />
+                      {field.showCounter && field.maxLength && (
+                        <p className="mt-1 text-xs text-gray-500 text-right">
+                          {String(value).length}/{field.maxLength}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
           {showNotifyField && (
             <Card className="mb-4">
               <InputField
@@ -495,7 +675,7 @@ const AccountInput = () => {
           )}
 
           {/* Validation Success Display */}
-          {validationRequired && validationData && validationData.DisplayData && validationData.DisplayData.length > 0 && (
+          {validationRequired && isValidationSuccessful && billerDetailRows.length > 0 && (
             <Card className="mb-4" style={{ backgroundColor: colors.state.successLight, borderColor: colors.state.success }}>
               <div className="flex items-center mb-3">
                 <Icon name="check_circle" size={24} className="text-green-600 mr-2" />
@@ -503,18 +683,12 @@ const AccountInput = () => {
               </div>
               
               <div className="space-y-2">
-                {validationData.DisplayData.map((item, index) => {
-                  if (!item.Value || item.Value.trim() === '') {
-                    return null;
-                  }
-                  
-                  return (
-                    <div key={index} className="flex flex-col">
-                      <span className="text-xs font-medium text-gray-600 mb-1">{item.Label}</span>
-                      <span className="text-sm text-gray-800 whitespace-pre-line">{item.Value}</span>
-                    </div>
-                  );
-                })}
+                {billerDetailRows.map((row) => (
+                  <div key={row.label} className="flex flex-col">
+                    <span className="text-xs font-medium text-gray-600 mb-1">{row.label}</span>
+                    <span className="text-sm text-gray-800 whitespace-pre-line">{row.value}</span>
+                  </div>
+                ))}
               </div>
 
               {/* Bill Amount — VAS response or payment amount for variable products */}
@@ -569,7 +743,7 @@ const AccountInput = () => {
             isValidationSuccessful &&
             showCharges &&
             chargeBreakdown &&
-            !(validationData?.DisplayData?.length > 0) && (
+            billerDetailRows.length === 0 && (
               <Card className="mb-4" style={{ backgroundColor: colors.state.successLight, borderColor: colors.state.success }}>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
@@ -604,53 +778,145 @@ const AccountInput = () => {
               </Card>
             )}
 
-          {/* Amount Input Field — show TotalAmount when charges apply (what customer pays) */}
-          <Card className="mb-4">
-            <InputField
-              type="number"
-              label="Payment Amount"
-              placeholder={isFixedAmount ? "Fixed amount" : `Enter amount (${currency})`}
-              value={paymentAmountDisplay}
-              onChange={(e) => {
-                if (!isFixedAmount && !showCharges) {
-                  setAmount(e.target.value);
-                }
-              }}
-              disabled={isFixedAmount || showCharges}
-              required
-            />
-            
-            {/* Amount limits display */}
-            {!showCharges && (minAmount > 0 || maxAmount > 0) && (
-              <div className="mt-2 text-xs text-gray-500">
-                {minAmount > 0 && maxAmount > 0 && Math.abs(minAmount - maxAmount) < 0.01 && (
-                  <span>Amount: {currency} {minAmount.toFixed(2)}</span>
-                )}
-                {minAmount > 0 && maxAmount > 0 && Math.abs(minAmount - maxAmount) >= 0.01 && (
-                  <span>Min: {currency} {minAmount.toFixed(2)} - Max: {currency} {maxAmount.toFixed(2)}</span>
-                )}
-                {minAmount > 0 && maxAmount === 0 && (
-                  <span>Minimum: {currency} {minAmount.toFixed(2)}</span>
-                )}
-                {minAmount === 0 && maxAmount > 0 && (
-                  <span>Maximum: {currency} {maxAmount.toFixed(2)}</span>
-                )}
+          {isPackageFlow && !isValidationSuccessful && (
+            <p className="mb-4 text-xs text-gray-500">
+              Validate your {fieldLabel.toLowerCase()} to see the available packages.
+            </p>
+          )}
+
+          {showPackagePicker && (
+            <Card className="mb-4">
+              <p className="text-sm font-medium text-gray-800 mb-1">Choose a package</p>
+              <p className="text-xs text-gray-500 mb-3">The package sets the amount to pay.</p>
+              <div className="space-y-2">
+                {packageOptions.map((option) => {
+                  const price = Number(option.Price) || 0;
+                  return (
+                    <label
+                      key={option.Id}
+                      className="flex items-center justify-between gap-2 text-sm text-gray-700 p-2 rounded border border-gray-200"
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="radio"
+                          name="dstvPackage"
+                          checked={selectedPackageId === option.Id}
+                          onChange={() => setSelectedPackageId(option.Id)}
+                        />
+                        <span className="break-words">{option.Name}</span>
+                      </span>
+                      <span className="flex-shrink-0 font-medium">
+                        {price > 0
+                          ? `${option.Currency || currency} ${price.toFixed(2)}`
+                          : 'Enter amount'}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
-            )}
-            
-            {showCharges && chargeBreakdown ? (
-              <div className="mt-2 text-xs text-gray-500">
-                You will be charged the total ({currency} {chargeBreakdown.totalAmount.toFixed(2)}).
-                Principal {currency} {chargeBreakdown.principalAmount.toFixed(2)} is sent to the biller.
+            </Card>
+          )}
+
+          {showAddOns && (!isPackageFlow || selectedPackageId) && (
+            <Card className="mb-4">
+              <p className="text-sm font-medium text-gray-800 mb-1">Optional add-on</p>
+              <p className="text-xs text-gray-500 mb-3">Choose none or one add-on</p>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between gap-2 text-sm text-gray-700 p-2 rounded border border-gray-200">
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="dstvAddon"
+                      checked={!selectedAddonCode}
+                      onChange={() => setSelectedAddonCode('')}
+                    />
+                    No add-on
+                  </span>
+                </label>
+                {productAddOns.map((addon) => (
+                  <label
+                    key={addon.Code}
+                    className="flex items-center justify-between gap-2 text-sm text-gray-700 p-2 rounded border border-gray-200"
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="radio"
+                        name="dstvAddon"
+                        checked={selectedAddonCode === addon.Code}
+                        onChange={() => setSelectedAddonCode(addon.Code)}
+                      />
+                      <span className="truncate">{addon.Name}</span>
+                    </span>
+                    <span className="flex-shrink-0 font-medium">
+                      {currency} {Number(addon.Price || 0).toFixed(2)}
+                    </span>
+                  </label>
+                ))}
               </div>
-            ) : (
-              isFixedAmount && productPrice > 0 && (
-                <div className="mt-2 text-xs text-gray-500">
-                  Fixed amount for this product
+            </Card>
+          )}
+
+          {/* Amount Input Field — what is sent to the biller; charges are added on top */}
+          {!awaitingPackage && (
+            <Card className="mb-4">
+              <InputField
+                type="number"
+                label="Payment Amount"
+                placeholder={isFixedAmount ? "Fixed amount" : `Enter amount (${currency})`}
+                value={amount}
+                onChange={(e) => {
+                  if (!isFixedAmount) {
+                    setAmount(e.target.value);
+                  }
+                }}
+                disabled={isFixedAmount}
+                required
+              />
+
+              {/* Amount limits display */}
+              {!isFixedAmount && (minAmount > 0 || maxAmount > 0) && (
+                <div
+                  className={`mt-2 text-xs ${
+                    amount && (isAmountBelowMin || isAmountAboveMax) ? 'text-red-600' : 'text-gray-500'
+                  }`}
+                >
+                  {minAmount > 0 && maxAmount > 0 && (
+                    <span>Min: {currency} {minAmount.toFixed(2)} - Max: {currency} {maxAmount.toFixed(2)}</span>
+                  )}
+                  {minAmount > 0 && maxAmount === 0 && (
+                    <span>Minimum: {currency} {minAmount.toFixed(2)}</span>
+                  )}
+                  {minAmount === 0 && maxAmount > 0 && (
+                    <span>Maximum: {currency} {maxAmount.toFixed(2)}</span>
+                  )}
                 </div>
-              )
-            )}
-          </Card>
+              )}
+
+              {showCharges && chargeBreakdown ? (
+                <div className="mt-2 text-xs text-gray-500">
+                  You will be charged the total ({currency} {chargeBreakdown.totalAmount.toFixed(2)}).
+                  Principal {currency} {chargeBreakdown.principalAmount.toFixed(2)} is sent to the biller.
+                </div>
+              ) : isValidationSuccessful && hasValidAmount && !isQuoteCurrent ? (
+                <div className="mt-2 text-xs text-gray-500">
+                  Service charges and the total payable are confirmed when you continue.
+                </div>
+              ) : (
+                isFixedAmount && productPrice > 0 && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    Fixed amount for this product
+                  </div>
+                )
+              )}
+
+              {quoteError && (
+                <div className="mt-3 rounded-lg p-3 bg-red-50 border border-red-200">
+                  <p className="text-sm font-semibold text-red-800">We couldn't confirm this amount</p>
+                  <p className="mt-0.5 text-sm text-red-700 break-words">{quoteError}</p>
+                </div>
+              )}
+            </Card>
+          )}
 
           {/* Warning Message if validation failed */}
           {hasValidationFailed && !validating && (
@@ -668,7 +934,11 @@ const AccountInput = () => {
 
           {/* Info Text */}
           <p className="text-xs text-center text-gray-500 mb-4">
-            Enter your account details to continue
+            {hasExtraFieldErrors || paymentCodeMissing
+              ? 'Complete the student details to continue.'
+              : showPackagePicker && awaitingPackage
+                ? 'Choose a package to continue.'
+                : 'Enter your account details to continue'}
           </p>
         </div>
 
@@ -684,7 +954,7 @@ const AccountInput = () => {
               fullWidth
               size="lg"
             >
-              Continue to Payment
+              {confirmingAmount ? 'Confirming amount...' : 'Continue to Payment'}
             </Button>
           </div>
         </div>

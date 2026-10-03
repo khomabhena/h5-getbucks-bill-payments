@@ -4,20 +4,20 @@ import { Button, Header, PageWrapper, Icon, Card } from '../components';
 import { colors } from '../data/colors';
 import { productRequiresNotifyNumber } from '../utils/creditPartyIdentifiers';
 import {
+  isFulfillmentPending,
+  resolveFulfillmentBillerMessage,
   resolveFulfillmentStatusCard,
   resolveFulfillmentStatusLabel,
   resolveFulfillmentUserMessage,
 } from '../utils/fulfillmentMessages';
-import { getBillPaymentReceiptPlainText } from '../utils/receiptText';
+import {
+  buildBillPaymentReceiptData,
+  generateBillPaymentReceiptPlainText,
+  getReceiptFileName,
+} from '../utils/receiptText';
+import { downloadReceiptFile } from '../utils/downloadReceipt';
+import { describeBillIdentifierExtras } from '../utils/billIdentifierFields';
 import { copyText } from '../utils/copyText';
-
-// Format currency as "USD 10" or "ZAR 23" (currency code first, no decimals)
-const formatCurrencyCode = (amount, currency = 'USD') => {
-  const currencyCode = (currency || 'USD').toUpperCase();
-  const amountValue = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
-  const roundedAmount = Math.round(amountValue);
-  return `${currencyCode} ${roundedAmount}`;
-};
 
 function getVoucherToken(voucher = {}) {
   return (
@@ -75,11 +75,16 @@ const Confirmation = () => {
     notifyNumber,
     amount, 
     validationData,
-    postPaymentResult
+    postPaymentResult,
+    extraIdentifierValues,
+    paymentCode,
+    selectedAddon,
+    accountNumber,
   } = location.state || {};
 
   const [copiedField, setCopiedField] = useState(null);
   const [receiptCopyStatus, setReceiptCopyStatus] = useState(null);
+  const [receiptDownloadStatus, setReceiptDownloadStatus] = useState(null);
   const autoCopiedForRef = useRef(null);
 
   const isPaymentSuccessful =
@@ -101,6 +106,10 @@ const Confirmation = () => {
       amount,
       validationData,
       postPaymentResult,
+      extraIdentifierValues,
+      paymentCode,
+      selectedAddon,
+      bankAccountNumber: accountNumber,
     }),
     [
       isPaymentSuccessful,
@@ -117,13 +126,31 @@ const Confirmation = () => {
       amount,
       validationData,
       postPaymentResult,
+      extraIdentifierValues,
+      paymentCode,
+      selectedAddon,
+      accountNumber,
     ]
   );
 
-  const receiptPlainText = useMemo(
-    () => getBillPaymentReceiptPlainText(receiptInput),
-    [receiptInput]
+  const identifierExtraRows = useMemo(
+    () => describeBillIdentifierExtras(product, { extraValues: extraIdentifierValues, paymentCode }),
+    [product, extraIdentifierValues, paymentCode]
   );
+
+  const receiptData = useMemo(() => buildBillPaymentReceiptData(receiptInput), [receiptInput]);
+  const receiptPlainText = useMemo(
+    () => generateBillPaymentReceiptPlainText(receiptData),
+    [receiptData]
+  );
+
+  const handleDownloadReceipt = useCallback(async () => {
+    const result = await downloadReceiptFile(
+      receiptPlainText,
+      getReceiptFileName(finalTransactionId)
+    );
+    setReceiptDownloadStatus(result);
+  }, [receiptPlainText, finalTransactionId]);
 
   const handleCopyReceipt = useCallback(
     async (source = 'manual') => {
@@ -193,7 +220,8 @@ const Confirmation = () => {
   };
   const fulfillmentCard = resolveFulfillmentStatusCard(fulfillmentResult, fulfillmentContext);
   const fulfillmentSuccess = fulfillmentResult?.success === true;
-  const fulfillmentPending = fulfillmentResult?.isFailedRepeatable === true;
+  const fulfillmentPending = isFulfillmentPending(fulfillmentResult);
+  const fulfillmentBillerMessage = resolveFulfillmentBillerMessage(fulfillmentResult);
   const fulfillmentFailedHard =
     Boolean(fulfillmentResult) && !fulfillmentSuccess && !fulfillmentPending;
   const fulfillmentUnavailable = isPaymentSuccessful && !fulfillmentResult;
@@ -337,6 +365,22 @@ const Confirmation = () => {
                     )}
                   </div>
                 )}
+
+                {identifierExtraRows.length > 0 && (
+                  <div className="p-3 rounded-lg border space-y-2" style={{
+                    backgroundColor: colors.background.tertiary,
+                    borderColor: colors.border.primary
+                  }}>
+                    {identifierExtraRows.map((row) => (
+                      <div key={row.label} className="flex justify-between items-start">
+                        <span className="text-xs text-gray-500">{row.label}</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[60%] break-words">
+                          {row.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 {/* Service & Country */}
                 {(service || country) && (
@@ -352,6 +396,35 @@ const Confirmation = () => {
                   </div>
                 )}
                 
+                {receiptData.addonName && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs text-gray-500">Add-on</span>
+                    <span className="text-sm font-medium text-gray-700 text-right max-w-[60%]">
+                      {receiptData.addonName}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-xs text-gray-500">Payment method</span>
+                  <span className="text-sm font-medium text-gray-700 text-right max-w-[60%]">
+                    {receiptData.paymentMethod}
+                  </span>
+                </div>
+
+                {receiptData.principalAmount && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs text-gray-500">Amount</span>
+                    <span className="text-sm font-medium text-gray-700">{receiptData.principalAmount}</span>
+                  </div>
+                )}
+                {receiptData.serviceCharge && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs text-gray-500">Service charge</span>
+                    <span className="text-sm font-medium text-gray-700">{receiptData.serviceCharge}</span>
+                  </div>
+                )}
+
                 {/* Date */}
                 <div className="flex justify-between items-center py-2">
                   <span className="text-xs text-gray-500">Date</span>
@@ -374,7 +447,7 @@ const Confirmation = () => {
                       className="text-xl font-bold"
                       style={{ color: colors.app.primaryDark }}
                     >
-                      {formatCurrencyCode(amount || 0, currency)}
+                      {receiptData.amountPaid}
                     </span>
                   </div>
                 </div>
@@ -441,6 +514,15 @@ const Confirmation = () => {
                   >
                     {fulfillmentMessage}
                   </p>
+                  {fulfillmentBillerMessage && (
+                    <p
+                      className={`text-xs mt-2 break-words ${
+                        fulfillmentFailedHard ? 'text-red-700' : 'text-amber-700'
+                      }`}
+                    >
+                      Biller response: {fulfillmentBillerMessage}
+                    </p>
+                  )}
                   {fulfillmentReferenceNumber && (
                     <p
                       className={`text-xs mt-2 ${
@@ -640,21 +722,16 @@ const Confirmation = () => {
           )}
 
           {/* Display Validation Data (if available) */}
-          {validationData && validationData.DisplayData && validationData.DisplayData.length > 0 && (
+          {receiptData.billerDetailRows.length > 0 && (
             <Card className="mb-6" style={{ backgroundColor: colors.state.successLight, borderColor: colors.state.success }}>
               <h3 className="font-bold text-sm text-green-800 mb-3">Account Information</h3>
               <div className="space-y-2">
-                {validationData.DisplayData.map((item, index) => {
-                  if (!item.Value || item.Value.trim() === '') {
-                    return null;
-                  }
-                  return (
-                    <div key={index} className="flex flex-col">
-                      <span className="text-xs font-medium text-gray-600 mb-1">{item.Label}</span>
-                      <span className="text-sm text-gray-800 whitespace-pre-line">{item.Value}</span>
-                    </div>
-                  );
-                })}
+                {receiptData.billerDetailRows.map((row) => (
+                  <div key={row.label} className="flex flex-col">
+                    <span className="text-xs font-medium text-gray-600 mb-1">{row.label}</span>
+                    <span className="text-sm text-gray-800 whitespace-pre-line">{row.value}</span>
+                  </div>
+                ))}
               </div>
             </Card>
           )}
@@ -684,14 +761,31 @@ const Confirmation = () => {
                 Could not copy automatically. Tap the button below to try again.
               </p>
             )}
-            <Button
-              onClick={() => handleCopyReceipt('manual')}
-              variant="secondary"
-              fullWidth
-              size="lg"
-            >
-              {receiptCopyStatus === 'manual' ? 'Copied!' : 'Copy receipt info'}
-            </Button>
+            {receiptDownloadStatus === 'failed' && (
+              <p className="text-xs text-center text-amber-700">
+                Could not save the file on this device. Use Copy receipt info instead.
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                onClick={handleDownloadReceipt}
+                variant="secondary"
+                fullWidth
+                size="lg"
+              >
+                {receiptDownloadStatus === 'downloaded' || receiptDownloadStatus === 'shared'
+                  ? 'Saved'
+                  : 'Download proof'}
+              </Button>
+              <Button
+                onClick={() => handleCopyReceipt('manual')}
+                variant="secondary"
+                fullWidth
+                size="lg"
+              >
+                {receiptCopyStatus === 'manual' ? 'Copied!' : 'Copy receipt'}
+              </Button>
+            </div>
             <Button
               onClick={handleDone}
               fullWidth

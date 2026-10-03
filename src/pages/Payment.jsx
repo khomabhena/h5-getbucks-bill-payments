@@ -12,6 +12,9 @@ import {
   resolveDebitAmount,
   shouldDisplayCharges,
 } from '../utils/billExtras';
+import { describeBillIdentifierExtras } from '../utils/billIdentifierFields';
+import { getBillerDetailRows } from '../utils/billerDetails';
+import { formatPaymentMethod } from '../utils/receiptText';
 
 // Local currency formatter (code + rounded amount)
 const formatCurrencyDisplay = (amount, currency = 'USD') => {
@@ -24,7 +27,11 @@ const formatCurrencyDisplay = (amount, currency = 'USD') => {
 const Payment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { country, service, provider, product, accountValue, primaryFieldName, notifyNumber, amount, validationData, selectedAddon, payUsingReferenceNumber } = location.state || {};
+  const { country, service, provider, product, accountValue, primaryFieldName, notifyNumber, amount, validationData, selectedAddon, payUsingReferenceNumber, extraIdentifierValues, paymentCode } = location.state || {};
+  const identifierExtraRows = describeBillIdentifierExtras(product, {
+    extraValues: extraIdentifierValues,
+    paymentCode,
+  });
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -94,6 +101,8 @@ const Payment = () => {
         validationData,
         selectedAddon: selectedAddon || null,
         payUsingReferenceNumber: Boolean(payUsingReferenceNumber),
+        extraIdentifierValues: extraIdentifierValues || {},
+        paymentCode: paymentCode || null,
         accountNumber: accountNumber || null,
         clientNumber: clientNumber || null,
         valueDateCalendar,
@@ -149,6 +158,9 @@ const Payment = () => {
           amount,
           validationData: paymentResult.validationData || validationData,
           postPaymentResult: paymentResult.postPaymentResult,
+          extraIdentifierValues: extraIdentifierValues || {},
+          paymentCode: paymentCode || null,
+          selectedAddon: selectedAddon || null,
           sessionID: sessionId || null,
           accountNumber: accountNumber || null,
           clientNumber: clientNumber || null,
@@ -200,6 +212,9 @@ const Payment = () => {
   const debitAmount = resolveDebitAmount(validationData, amount);
   const chargeBreakdown = getChargeBreakdown(validationData);
   const showCharges = shouldDisplayCharges(product, validationData);
+  const billerDetailRows = getBillerDetailRows(validationData, {
+    omitValues: [accountValue, accountName],
+  });
 
   const getStatusCardStyle = () => {
     if (!statusCard) return {};
@@ -318,6 +333,38 @@ const Payment = () => {
                     </div>
                   )}
                 </div>
+
+                {identifierExtraRows.length > 0 && (
+                  <div className="p-3 rounded-lg border space-y-2" style={{
+                    backgroundColor: colors.background.tertiary,
+                    borderColor: colors.border.primary
+                  }}>
+                    {identifierExtraRows.map((row) => (
+                      <div key={row.label} className="flex justify-between items-start">
+                        <span className="text-xs text-gray-500">{row.label}</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[60%] break-words">
+                          {row.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {billerDetailRows.length > 0 && (
+                  <div className="p-3 rounded-lg border space-y-2" style={{
+                    backgroundColor: colors.background.tertiary,
+                    borderColor: colors.border.primary
+                  }}>
+                    {billerDetailRows.map((row) => (
+                      <div key={row.label} className="flex justify-between items-start">
+                        <span className="text-xs text-gray-500">{row.label}</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[60%] break-words whitespace-pre-line">
+                          {row.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 {/* Country */}
                 <div className="flex justify-between items-center py-2">
@@ -325,6 +372,16 @@ const Payment = () => {
                   <span className="text-sm font-medium text-gray-700">
                     {country?.countryName || 'N/A'}
                   </span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-xs text-gray-500">Payment method</span>
+                  <span className="text-sm font-medium text-gray-700 text-right max-w-[60%]">
+                    {formatPaymentMethod(accountNumber)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-xs text-gray-500">Currency</span>
+                  <span className="text-sm font-medium text-gray-700">{currency.toUpperCase()}</span>
                 </div>
                 
                 {/* Total Price - Highlighted */}
@@ -433,6 +490,11 @@ const Payment = () => {
                   <p className="font-semibold text-sm">{statusCard.title}</p>
                   {statusCard.message && (
                     <p className="text-xs mt-1 opacity-80">{statusCard.message}</p>
+                  )}
+                  {statusCard.billerMessage && (
+                    <p className="text-xs mt-1 opacity-80 break-words">
+                      Biller response: {statusCard.billerMessage}
+                    </p>
                   )}
                 </div>
               </div>

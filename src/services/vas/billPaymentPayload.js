@@ -75,6 +75,8 @@ function buildCreditPartySection({
   notifyNumber,
   customerDetails,
   primaryFieldName,
+  extraIdentifierValues = {},
+  stage = 'post',
 }) {
   const resolvedCustomer = resolveCustomerDetailsForVas(customerDetails);
   const primaryField = primaryFieldName;
@@ -93,6 +95,8 @@ function buildCreditPartySection({
       customerDetails: resolvedCustomer,
       notifyNumber,
       primaryFieldName: primaryField,
+      extraValues: extraIdentifierValues || {},
+      stage,
     }),
   };
 }
@@ -157,6 +161,7 @@ export function buildValidatePaymentPayload({
   billReferenceNumber,
   payUsingReferenceNumber = false,
   selectedAddon = null,
+  paymentCode = null,
 }) {
   const resolvedCustomer = resolveCustomerDetailsForVas(customerDetails);
   const creditParty = buildCreditPartySection({
@@ -165,6 +170,7 @@ export function buildValidatePaymentPayload({
     notifyNumber,
     customerDetails: resolvedCustomer,
     primaryFieldName,
+    stage: 'validate',
   });
 
   const payload = {
@@ -192,6 +198,10 @@ export function buildValidatePaymentPayload({
     payload.ProductAddOns = addOns;
   }
 
+  if (paymentCode) {
+    payload.PaymentCode = String(paymentCode);
+  }
+
   return payload;
 }
 
@@ -208,6 +218,8 @@ export function buildPostPaymentPayload({
   primaryFieldName,
   payUsingReferenceNumber = false,
   selectedAddon = null,
+  extraIdentifierValues = {},
+  paymentCode = null,
 }) {
   const fulfillmentValidation = validationData || {};
   const resolvedRequestId =
@@ -243,6 +255,8 @@ export function buildPostPaymentPayload({
     notifyNumber,
     customerDetails: resolvedCustomer,
     primaryFieldName,
+    extraIdentifierValues,
+    stage: 'post',
   });
 
   const posDetails = {
@@ -277,13 +291,20 @@ export function buildPostPaymentPayload({
     payload.ProductAddOns = addOns;
   }
 
+  if (paymentCode) {
+    payload.PaymentCode = String(paymentCode);
+  }
+
   return payload;
 }
+
+const PENDING_STATUS_PATTERN = /PENDING|PROCESSING|SUBMITTED|IN_?PROGRESS|QUEUED/i;
 
 export function mapVasPaymentToUiResult(response, requestId) {
   const isSuccess =
     response?.Status === 'SUCCESSFUL' || response?.Status === 'VALIDATED';
   const isRetryable = response?.Status === 'FAILEDREPEATABLE';
+  const isPending = !isSuccess && PENDING_STATUS_PATTERN.test(String(response?.Status || ''));
   const receiptHTML = response?.ReceiptHTML;
   const receiptSmses = response?.ReceiptSmses;
 
@@ -299,29 +320,38 @@ export function mapVasPaymentToUiResult(response, requestId) {
     displayData: response?.DisplayData || [],
     isRetryable,
     isFailedRepeatable: isRetryable,
+    isPending,
     data: response,
     source: 'vas',
   };
 }
 
 export function mapVasPaymentErrorToUiResult(error, requestId) {
+  // VAS server non-200 body is { error, code, details: <upstream VAS response> }
+  const responseData = error.responseData || {};
+  const upstream =
+    responseData.details && typeof responseData.details === 'object' ? responseData.details : responseData;
+  const status = upstream.Status || responseData.Status || 'ERROR';
+
   return {
     success: false,
-    status: error.responseData?.Status || 'ERROR',
+    status,
     requestId,
     error: error.message,
     resultMessage:
-      error.responseData?.ResultMessage ||
-      error.responseData?.ResultInformation ||
+      upstream.ResultMessage ||
+      upstream.ResultInformation ||
+      responseData.error ||
       error.message ||
       'VAS payment request failed',
-    referenceNumber: error.responseData?.ReferenceNumber,
+    referenceNumber: upstream.ReferenceNumber,
     vouchers: [],
     receiptHTML: [],
     receiptSmses: [],
-    displayData: error.responseData?.DisplayData || [],
-    isRetryable: error.responseData?.Status === 'FAILEDREPEATABLE',
-    isFailedRepeatable: error.responseData?.Status === 'FAILEDREPEATABLE',
+    displayData: upstream.DisplayData || [],
+    isRetryable: status === 'FAILEDREPEATABLE',
+    isFailedRepeatable: status === 'FAILEDREPEATABLE',
+    isPending: PENDING_STATUS_PATTERN.test(String(status)),
     source: 'vas',
   };
 }

@@ -77,6 +77,22 @@ const ProductSelection = () => {
       const categoryRows = scopedProducts.filter((product) => product.IsCategory === true);
       const leafProducts = scopedProducts.filter((product) => product.IsCategory !== true);
 
+      // DSTV packages are separate products: validate the smartcard first, pick the package after.
+      const isDstvPackageList =
+        !currentParentProduct &&
+        categoryRows.length === 0 &&
+        leafProducts.length > 1 &&
+        leafProducts.every((product) => product.IsDSTVProduct === true);
+      if (isDstvPackageList) {
+        const validationProduct =
+          leafProducts.find((product) => !(Number(product.Price) > 0)) || leafProducts[0];
+        navigate(ROUTES.ACCOUNT, {
+          replace: true,
+          state: { country, service, provider, product: validationProduct, packageOptions: leafProducts },
+        });
+        return;
+      }
+
       setCategories(categoryRows);
       setProducts(leafProducts);
 
@@ -100,7 +116,7 @@ const ProductSelection = () => {
     } finally {
       setLoading(false);
     }
-  }, [country, service, provider, accountCurrency, currentParentProduct]);
+  }, [country, service, provider, accountCurrency, currentParentProduct, navigate]);
 
   useEffect(() => {
     if (country && service && provider) {

@@ -21,6 +21,27 @@ export function resolveValidateAmount(baseAmount, selectedAddon) {
   return base + addonPrice;
 }
 
+const DEFAULT_VALIDATION_PROBE_AMOUNT = 5;
+
+/**
+ * Amount sent with ValidatePayment before the customer has entered one.
+ * ZB rejects 0 ("Transaction amount is outside the allowed limits"), so the account is checked
+ * with an in-limits placeholder and re-quoted with the real amount on Continue.
+ */
+export function resolveValidationAmount(product, enteredAmount, selectedAddon = null) {
+  const min = Number(product?.MinimumAmount) || 0;
+  const max = Number(product?.MaximumAmount) || 0;
+  const price = Number(product?.Price) || 0;
+  const entered = parseFloat(enteredAmount);
+  const withinLimits = (value) => value > 0 && (!min || value >= min) && (!max || value <= max);
+
+  if (Number.isFinite(entered) && withinLimits(entered)) return entered;
+
+  const base = price > 0 ? price : min > 0 ? min : DEFAULT_VALIDATION_PROBE_AMOUNT;
+  const capped = max > 0 ? Math.min(base, max) : base;
+  return resolveValidateAmount(capped, price > 0 ? selectedAddon : null);
+}
+
 export function buildSelectedProductAddOns(selectedAddon) {
   // VAS expects ProductAddOns as string[] of Codes, not objects
   if (!selectedAddon?.Code) return undefined;
@@ -50,18 +71,6 @@ export function shouldDisplayCharges(product, validationData) {
     breakdown.taxCharge > 0 ||
     breakdown.totalCharges > 0
   );
-}
-
-/**
- * Bill amount the user is paying. When VAS returned charges, its PrincipalAmount wins
- * (the amount field is locked then, and may be blank for billers like Nyaradzo that quote the amount).
- */
-export function resolveEffectiveAmount(product, validationData, enteredAmount) {
-  if (shouldDisplayCharges(product, validationData)) {
-    const principal = getChargeBreakdown(validationData)?.principalAmount;
-    if (principal > 0) return principal;
-  }
-  return parseFloat(enteredAmount);
 }
 
 /** Amount to debit from customer (bank / SuperApp) — TotalAmount when present. */

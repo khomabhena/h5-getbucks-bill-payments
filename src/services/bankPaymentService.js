@@ -149,6 +149,7 @@ class BankPaymentService {
       primaryFieldName: paymentData.primaryFieldName,
       payUsingReferenceNumber: paymentData.payUsingReferenceNumber,
       selectedAddon: paymentData.selectedAddon,
+      paymentCode: paymentData.paymentCode,
     });
 
     const result = await validateBillPayment(payload);
@@ -198,6 +199,8 @@ class BankPaymentService {
       primaryFieldName: paymentData.primaryFieldName,
       payUsingReferenceNumber: paymentData.payUsingReferenceNumber,
       selectedAddon: paymentData.selectedAddon,
+      extraIdentifierValues: paymentData.extraIdentifierValues,
+      paymentCode: paymentData.paymentCode,
     });
 
     console.log('📤 VAS PostPayment (bill):', payload);
