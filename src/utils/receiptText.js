@@ -7,7 +7,7 @@ import {
 import { stripHtml } from './stripHtml.js';
 import { describeBillIdentifierExtras } from './billIdentifierFields.js';
 import { getBillerDetailRows } from './billerDetails.js';
-import { getChargeBreakdown, resolveDebitAmount } from './billExtras.js';
+import { getChargeBreakdown, resolveDebitAmount, resolveServiceCharge } from './billExtras.js';
 
 export const PAYMENT_METHOD_LABEL = 'GetBucks bank account';
 
@@ -84,6 +84,11 @@ export const buildBillPaymentReceiptData = ({
 
   const accountName = getAccountName(validationData, accountValue);
   const charges = getChargeBreakdown(validationData);
+  const serviceChargeValue = resolveServiceCharge(validationData, amount || 0, currency);
+  const identifierExtraRows = describeBillIdentifierExtras(product, {
+    extraValues: extraIdentifierValues,
+    paymentCode,
+  });
   const statusLabel = resolveFulfillmentStatusLabel(fulfillmentResult);
   const statusDetail = resolveFulfillmentUserMessage(fulfillmentResult, {
     amount,
@@ -112,22 +117,21 @@ export const buildBillPaymentReceiptData = ({
     accountValue: accountValue || 'N/A',
     accountName: accountName && accountName !== accountValue ? accountName : null,
     notifyNumber: notifyNumber || null,
-    identifierExtraRows: describeBillIdentifierExtras(product, {
-      extraValues: extraIdentifierValues,
-      paymentCode,
-    }),
+    identifierExtraRows,
     billerDetailRows: getBillerDetailRows(validationData, {
+      omitLabels: identifierExtraRows.map((row) => row.label),
       omitValues: [accountValue, accountName],
     }),
     countryName: country?.countryName || null,
     serviceName: service?.Name || null,
     currency: currency.toUpperCase(),
-    principalAmount: charges ? formatCurrencyCode(charges.principalAmount, currency) : null,
-    serviceCharge:
+    principalAmount: formatCurrencyCode(charges ? charges.principalAmount : amount || 0, currency),
+    billerCharge:
       charges && charges.billerCharge + charges.taxCharge > 0
         ? formatCurrencyCode(charges.billerCharge + charges.taxCharge, currency)
         : null,
-    amountPaid: formatCurrencyCode(resolveDebitAmount(validationData, amount || 0), currency),
+    serviceCharge: serviceChargeValue > 0 ? formatCurrencyCode(serviceChargeValue, currency) : null,
+    amountPaid: formatCurrencyCode(resolveDebitAmount(validationData, amount || 0, currency), currency),
     date: timestamp ? new Date(timestamp).toLocaleString() : new Date().toLocaleString(),
     fulfillmentDisplayData,
     vouchers,
@@ -168,7 +172,8 @@ export const generateBillPaymentReceiptPlainText = (receiptData) => {
     receiptData.countryName ? `Country: ${receiptData.countryName}` : null,
     receiptData.serviceName ? `Service: ${receiptData.serviceName}` : null,
     `Currency: ${receiptData.currency}`,
-    receiptData.principalAmount ? `Amount: ${receiptData.principalAmount}` : null,
+    `Amount: ${receiptData.principalAmount}`,
+    receiptData.billerCharge ? `Biller charge: ${receiptData.billerCharge}` : null,
     receiptData.serviceCharge ? `Service charge: ${receiptData.serviceCharge}` : null,
     `Total paid: ${receiptData.amountPaid}`,
     '',

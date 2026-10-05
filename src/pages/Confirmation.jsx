@@ -418,6 +418,12 @@ const Confirmation = () => {
                     <span className="text-sm font-medium text-gray-700">{receiptData.principalAmount}</span>
                   </div>
                 )}
+                {receiptData.billerCharge && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs text-gray-500">Biller charge</span>
+                    <span className="text-sm font-medium text-gray-700">{receiptData.billerCharge}</span>
+                  </div>
+                )}
                 {receiptData.serviceCharge && (
                   <div className="flex justify-between items-center py-2">
                     <span className="text-xs text-gray-500">Service charge</span>

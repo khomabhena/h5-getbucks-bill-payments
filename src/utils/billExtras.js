@@ -3,6 +3,8 @@
  * (VAS catalog fields from AppleTree / Hot Recharge V2).
  */
 
+import { SERVICE_CHARGE } from '../config/serviceCharge.js';
+
 export function getProductAddOns(product) {
   return Array.isArray(product?.ProductAddOns) ? product.ProductAddOns : [];
 }
@@ -73,13 +75,36 @@ export function shouldDisplayCharges(product, validationData) {
   );
 }
 
-/** Amount to debit from customer (bank / SuperApp) — TotalAmount when present. */
-export function resolveDebitAmount(validationData, fallbackAmount) {
-  const breakdown = getChargeBreakdown(validationData);
-  if (breakdown && breakdown.totalAmount > 0) {
-    return breakdown.totalAmount;
+const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+/** Our service charge on a bill amount (see config/serviceCharge.js). */
+export function getServiceCharge(billAmount, currency = 'USD') {
+  const base = Number(billAmount) || 0;
+  const { percent, minUsd, maxUsd } = SERVICE_CHARGE;
+  if (!(percent > 0) || base <= 0) return 0;
+
+  let charge = (base * percent) / 100;
+  if (String(currency || 'USD').toUpperCase() === 'USD') {
+    if (minUsd > 0) charge = Math.max(charge, minUsd);
+    if (maxUsd > 0) charge = Math.min(charge, maxUsd);
   }
-  return Number(fallbackAmount) || 0;
+  return roundMoney(charge);
+}
+
+/** Service charge for a quote: on the VAS PrincipalAmount when present, else the entered amount. */
+export function resolveServiceCharge(validationData, fallbackAmount, currency = 'USD') {
+  const breakdown = getChargeBreakdown(validationData);
+  const billAmount =
+    breakdown && breakdown.principalAmount > 0 ? breakdown.principalAmount : Number(fallbackAmount) || 0;
+  return getServiceCharge(billAmount, currency);
+}
+
+/** Amount to debit from the customer (bank): VAS TotalAmount (or entered amount) plus our service charge. */
+export function resolveDebitAmount(validationData, fallbackAmount, currency = 'USD') {
+  const breakdown = getChargeBreakdown(validationData);
+  const vasTotal =
+    breakdown && breakdown.totalAmount > 0 ? breakdown.totalAmount : Number(fallbackAmount) || 0;
+  return roundMoney(vasTotal + resolveServiceCharge(validationData, fallbackAmount, currency));
 }
 
 /** Amount for VAS PostPayment — PrincipalAmount when present. */

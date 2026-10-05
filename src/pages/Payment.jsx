@@ -10,6 +10,7 @@ import { getBankCalendarDateToday } from '../utils/bankValueDate';
 import {
   getChargeBreakdown,
   resolveDebitAmount,
+  resolveServiceCharge,
   shouldDisplayCharges,
 } from '../utils/billExtras';
 import { describeBillIdentifierExtras } from '../utils/billIdentifierFields';
@@ -209,10 +210,12 @@ const Payment = () => {
 
   const currency = product?.Currency || product?.currency || accountCurrency || 'USD';
   const accountName = getAccountName();
-  const debitAmount = resolveDebitAmount(validationData, amount);
+  const debitAmount = resolveDebitAmount(validationData, amount, currency);
+  const serviceCharge = resolveServiceCharge(validationData, amount, currency);
   const chargeBreakdown = getChargeBreakdown(validationData);
   const showCharges = shouldDisplayCharges(product, validationData);
   const billerDetailRows = getBillerDetailRows(validationData, {
+    omitLabels: identifierExtraRows.map((row) => row.label),
     omitValues: [accountValue, accountName],
   });
 
@@ -416,6 +419,20 @@ const Payment = () => {
                     <div className="flex justify-between text-xs text-gray-600 mb-2">
                       <span>Add-on</span>
                       <span className="text-right max-w-[60%]">{selectedAddon.Name}</span>
+                    </div>
+                  )}
+                  {serviceCharge > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {!(showCharges && chargeBreakdown) && (
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Bill amount</span>
+                          <span>{formatCurrencyDisplay(amount, currency)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Service charge</span>
+                        <span>{formatCurrencyDisplay(serviceCharge, currency)}</span>
+                      </div>
                     </div>
                   )}
                   <div className="flex justify-between items-center">

@@ -28,6 +28,8 @@ import {
   buildSelectedProductAddOns,
   getChargeBreakdown,
   getProductAddOns,
+  resolveDebitAmount,
+  resolveServiceCharge,
   resolveValidateAmount,
   resolveValidationAmount,
   shouldDisplayCharges,
@@ -458,6 +460,9 @@ const AccountInput = () => {
     : null;
   const chargeBreakdown = isQuoteCurrent ? getChargeBreakdown(validationData) : null;
   const showCharges = isQuoteCurrent && shouldDisplayCharges(product, validationData);
+  const quotedAmount = displayBillAmount ?? amount;
+  const serviceCharge = isQuoteCurrent ? resolveServiceCharge(validationData, quotedAmount, currency) : 0;
+  const customerTotal = isQuoteCurrent ? resolveDebitAmount(validationData, quotedAmount, currency) : 0;
   const billerDetailRows = getBillerDetailRows(validationData);
   const showPackagePicker = isPackageFlow && isValidationSuccessful;
   const awaitingPackage = isPackageFlow && !selectedPackageId;
@@ -737,20 +742,46 @@ const AccountInput = () => {
                           </span>
                         </div>
                       )}
+                      {serviceCharge > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-medium text-gray-600">Service charge:</span>
+                          <span className="text-sm text-gray-800">
+                            {currency} {serviceCharge.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-medium text-gray-600">Total amount:</span>
                         <span className="text-sm font-semibold text-green-700">
-                          {currency} {chargeBreakdown.totalAmount.toFixed(2)}
+                          {currency} {customerTotal.toFixed(2)}
                         </span>
                       </div>
                     </>
                   ) : (
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-medium text-gray-600">Bill Amount:</span>
-                      <span className="text-sm font-semibold text-green-700">
-                        {currency} {displayBillAmount.toFixed(2)}
-                      </span>
-                    </div>
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-gray-600">Bill Amount:</span>
+                        <span className="text-sm font-semibold text-green-700">
+                          {currency} {displayBillAmount.toFixed(2)}
+                        </span>
+                      </div>
+                      {serviceCharge > 0 && (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-medium text-gray-600">Service charge:</span>
+                            <span className="text-sm text-gray-800">
+                              {currency} {serviceCharge.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-medium text-gray-600">Total amount:</span>
+                            <span className="text-sm font-semibold text-green-700">
+                              {currency} {customerTotal.toFixed(2)}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -787,10 +818,18 @@ const AccountInput = () => {
                       </span>
                     </div>
                   )}
+                  {serviceCharge > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium text-gray-600">Service charge:</span>
+                      <span className="text-sm text-gray-800">
+                        {currency} {serviceCharge.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-medium text-gray-600">Total amount:</span>
                     <span className="text-sm font-semibold text-green-700">
-                      {currency} {chargeBreakdown.totalAmount.toFixed(2)}
+                      {currency} {customerTotal.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -913,7 +952,7 @@ const AccountInput = () => {
 
               {showCharges && chargeBreakdown ? (
                 <div className="mt-2 text-xs text-gray-500">
-                  You will be charged the total ({currency} {chargeBreakdown.totalAmount.toFixed(2)}).
+                  You will be charged the total ({currency} {customerTotal.toFixed(2)}).
                   Principal {currency} {chargeBreakdown.principalAmount.toFixed(2)} is sent to the biller.
                 </div>
               ) : isValidationSuccessful && hasValidAmount && !isQuoteCurrent ? (

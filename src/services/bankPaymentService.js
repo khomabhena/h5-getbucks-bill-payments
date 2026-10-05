@@ -256,9 +256,9 @@ class BankPaymentService {
       const reference = this.generateReference();
 
       // Prepare transfer data — bank debit uses account currency; VAS uses product currency.
-      // Debit TotalAmount when charges exist; VAS PostPayment uses PrincipalAmount separately.
-      const amount = resolveDebitAmount(validationData, paymentData.amount);
+      // Debit TotalAmount (or entered amount) plus our service charge; VAS PostPayment uses PrincipalAmount separately.
       const vasCurrency = (paymentData.currency || this.defaultCurrency).toString().toUpperCase();
+      const amount = resolveDebitAmount(validationData, paymentData.amount, vasCurrency);
       const bankCurrency = (
         paymentData.bankCurrency ||
         paymentData.accountCurrency ||
