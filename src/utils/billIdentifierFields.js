@@ -167,6 +167,80 @@ export function getStudentNameFromValidation(validationData) {
   return match ? String(match.Value).trim() : '';
 }
 
+/** DisplayData labels that carry the value for each extra identifier (Level is always typed by the customer). */
+const PREFILL_DISPLAY_LABELS = {
+  semester: new Set(['semester', 'studentsemester']),
+  studentgrade: new Set(['studentgrade', 'grade']),
+  studentterm: new Set(['studentterm', 'term']),
+};
+
+const ORDINAL_NUMBERS = { first: '1', one: '1', i: '1', second: '2', two: '2', ii: '2', third: '3', three: '3', iii: '3' };
+
+/** Match free text like "SEMESTER 2 CUT", "Term 1" or "Second" to a select option. */
+function matchSelectOption(field, text, keyword) {
+  const value = String(text || '').trim();
+  if (!value || !field.options?.length) return '';
+
+  const exact = field.options.find(
+    (option) => normalize(option.value) === normalize(value) || normalize(option.label) === normalize(value)
+  );
+  if (exact) return exact.value;
+
+  const pattern = new RegExp(`\\b${keyword}\\s*(\\d|first|second|third|one|two|three|iii|ii|i)\\b`, 'i');
+  const token = value.match(pattern)?.[1] || (field.options.length && value.match(/^\s*(\d)\s*$/)?.[1]);
+  if (!token) return '';
+
+  const number = ORDINAL_NUMBERS[token.toLowerCase()] || token;
+  const option = field.options.find(
+    (item) =>
+      item.value === number ||
+      ORDINAL_NUMBERS[String(item.value).toLowerCase()] === number ||
+      new RegExp(`\\b${number}\\b`).test(item.label)
+  );
+  return option ? option.value : '';
+}
+
+/**
+ * Values for the product's extra identifiers that ValidatePayment already returned
+ * (e.g. CUT: Account Name → Student Name, "Level: SEMESTER 2 CUT" → Semester 2 + Level).
+ * Only fields the product asks for are returned; the customer can still edit them.
+ */
+export function getExtraValuesFromValidation(product, validationData) {
+  const items = (validationData?.DisplayData || []).filter((item) => String(item?.Value ?? '').trim());
+  if (!items.length) return {};
+
+  const findValue = (labels) => {
+    const match = items.find((item) => labels.has(normalize(item.Label)));
+    return match ? String(match.Value).trim() : '';
+  };
+
+  const prefill = {};
+  for (const field of getExtraIdentifierFields(product)) {
+    const key = normalize(field.name);
+    let value = '';
+
+    if (key === 'studentname') {
+      value = getStudentNameFromValidation(validationData);
+    } else if (key === 'semester') {
+      const direct = findValue(PREFILL_DISPLAY_LABELS.semester);
+      value =
+        matchSelectOption(field, direct, 'sem(?:ester)?') ||
+        items.map((item) => matchSelectOption(field, item.Value, 'sem(?:ester)?')).find(Boolean) ||
+        '';
+    } else if (key === 'studentterm') {
+      value = matchSelectOption(field, findValue(PREFILL_DISPLAY_LABELS.studentterm), 'term');
+    } else if (PREFILL_DISPLAY_LABELS[key]) {
+      value = findValue(PREFILL_DISPLAY_LABELS[key]);
+    }
+
+    if (!value) continue;
+    if (field.maxLength && value.length > field.maxLength) continue;
+    prefill[field.name] = value;
+  }
+
+  return prefill;
+}
+
 /** Label / value rows for order summary, confirmation and receipt. */
 export function describeBillIdentifierExtras(product, { extraValues = {}, paymentCode = null } = {}) {
   const rows = [];

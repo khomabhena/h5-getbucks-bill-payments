@@ -20,8 +20,8 @@ import {
   cleanExtraValues,
   getExtraFieldErrors,
   getExtraIdentifierFields,
+  getExtraValuesFromValidation,
   getPaymentCodeConfig,
-  getStudentNameFromValidation,
 } from '../utils/billIdentifierFields';
 import { getServiceIconName } from '../utils/serviceIcons';
 import {
@@ -98,6 +98,7 @@ const AccountInput = () => {
   const [confirmingAmount, setConfirmingAmount] = useState(false);
   const [quoteError, setQuoteError] = useState(null);
   const currentValidationRequestRef = useRef(null);
+  const autoFilledValuesRef = useRef({});
   const customerDetailsRef = useRef(resolveCustomerDetailsForVas());
 
   const showNotifyField = productRequiresNotifyNumber(product);
@@ -141,6 +142,7 @@ const AccountInput = () => {
     setSelectedAddonCode('');
     setPayUsingReferenceNumber(false);
     setExtraValues({});
+    autoFilledValuesRef.current = {};
     setPaymentCode('');
   }, [product?.Id]);
 
@@ -217,6 +219,31 @@ const AccountInput = () => {
   useEffect(() => {
     payUsingReferenceNumberRef.current = payUsingReferenceNumber;
   }, [payUsingReferenceNumber]);
+
+  /**
+   * Fill student details the biller returned on validation. Values the customer typed are kept;
+   * values we filled from an earlier validation are replaced.
+   */
+  const applyValidationPrefill = useCallback(
+    (validationResponse) => {
+      const prefill = getExtraValuesFromValidation(product, validationResponse);
+      const previous = autoFilledValuesRef.current;
+      autoFilledValuesRef.current = prefill;
+
+      setExtraValues((prev) => {
+        const next = { ...prev };
+        for (const [name, value] of Object.entries(previous)) {
+          if (next[name] === value && !(name in prefill)) delete next[name];
+        }
+        for (const [name, value] of Object.entries(prefill)) {
+          const current = String(next[name] ?? '').trim();
+          if (!current || current === previous[name]) next[name] = value;
+        }
+        return next;
+      });
+    },
+    [product]
+  );
 
   /**
    * ValidatePayment for the current product / account at the given amount.
@@ -323,15 +350,7 @@ const AccountInput = () => {
         addonCode: selectedAddonRef.current?.Code || '',
       });
 
-      const suggestedName = getStudentNameFromValidation(data);
-      const hasStudentNameField = getExtraIdentifierFields(product).some(
-        (field) => field.name === 'StudentName'
-      );
-      if (suggestedName && hasStudentNameField) {
-        setExtraValues((prev) =>
-          prev.StudentName?.trim() ? prev : { ...prev, StudentName: suggestedName }
-        );
-      }
+      applyValidationPrefill(data);
     } catch (error) {
       console.error('Validation error:', error);
       if (currentValidationRequestRef.current !== attemptId) return;
@@ -344,7 +363,7 @@ const AccountInput = () => {
         setValidating(false);
       }
     }
-  }, [product, minAccountLength, validationRequired, requestValidation]);
+  }, [product, minAccountLength, validationRequired, requestValidation, applyValidationPrefill]);
 
   // A different account invalidates the previous result; the user re-validates via the button.
   // Amount / package / add-on changes keep the account validation and are re-quoted on Continue.
