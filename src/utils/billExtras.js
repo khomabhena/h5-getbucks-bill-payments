@@ -13,6 +13,12 @@ export function supportsDstvAddOns(product) {
   return product?.IsDSTVProduct === true && getProductAddOns(product).length > 0;
 }
 
+export function getProductLabel(product) {
+  return product?.IsDSTVProduct === true && product?.ProductType !== 'VariableAmount'
+    ? 'Package'
+    : 'Product';
+}
+
 export function supportsPayUsingReferenceNumber(product) {
   return product?.PayUsingReferenceNumberSupported === true;
 }

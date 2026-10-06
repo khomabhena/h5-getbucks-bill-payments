@@ -9,12 +9,14 @@ import { resolveFulfillmentStatusCard } from '../utils/fulfillmentMessages';
 import { getBankCalendarDateToday } from '../utils/bankValueDate';
 import {
   getChargeBreakdown,
+  getProductLabel,
   resolveDebitAmount,
   resolveServiceCharge,
   shouldDisplayCharges,
 } from '../utils/billExtras';
 import { describeBillIdentifierExtras } from '../utils/billIdentifierFields';
 import { getBillerDetailRows } from '../utils/billerDetails';
+import { getAccountLabel } from '../utils/identifierLabel';
 import { formatPaymentMethod } from '../utils/receiptText';
 
 // Local currency formatter (code + rounded amount)
@@ -301,7 +303,7 @@ const Payment = () => {
                     </span>
                   </div>
                   <div className="flex justify-between items-start">
-                    <span className="text-xs text-gray-500">Product</span>
+                    <span className="text-xs text-gray-500">{getProductLabel(product)}</span>
                     <span className="text-sm font-semibold text-gray-900 text-right max-w-[60%]">
                       {product?.Name || product?.name || 'N/A'}
                     </span>
@@ -314,7 +316,7 @@ const Payment = () => {
                   borderColor: colors.border.primary 
                 }}>
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs text-gray-500">Account Number</span>
+                    <span className="text-xs text-gray-500">{getAccountLabel({ product, service, provider })}</span>
                     <span className="text-sm font-medium text-gray-900 text-right max-w-[60%] break-words">
                       {accountValue || 'N/A'}
                     </span>

@@ -18,6 +18,7 @@ import {
 import { downloadReceiptFile } from '../utils/downloadReceipt';
 import { describeBillIdentifierExtras } from '../utils/billIdentifierFields';
 import { copyText } from '../utils/copyText';
+import { formatDate } from '../utils/formatDate';
 
 function getVoucherToken(voucher = {}) {
   return (
@@ -235,7 +236,7 @@ const Confirmation = () => {
   const vouchers = fulfillmentResult?.vouchers || [];
   const receiptHTML = fulfillmentResult?.receiptHTML || [];
   const receiptSmses = fulfillmentResult?.receiptSmses || [];
-  const fulfillmentDisplayData = fulfillmentResult?.displayData || [];
+  const fulfillmentDisplayData = receiptData.fulfillmentDisplayData;
 
   return (
     <PageWrapper>
@@ -324,7 +325,7 @@ const Confirmation = () => {
                     )}
                     {product && (
                       <div className="flex justify-between items-start">
-                        <span className="text-xs text-gray-500">Product</span>
+                        <span className="text-xs text-gray-500">{receiptData.productLabel}</span>
                         <span className="text-sm font-semibold text-gray-900 text-right max-w-[60%]">
                           {product?.Name || product?.name || 'N/A'}
                         </span>
@@ -341,7 +342,7 @@ const Confirmation = () => {
                   }}>
                     {accountValue && (
                       <div className="flex justify-between items-start mb-2">
-                        <span className="text-xs text-gray-500">Account Number</span>
+                        <span className="text-xs text-gray-500">{receiptData.accountLabel}</span>
                         <span className="text-sm font-medium text-gray-900 text-right max-w-[60%] break-words">
                           {accountValue}
                         </span>
@@ -405,6 +406,15 @@ const Confirmation = () => {
                   </div>
                 )}
 
+                {receiptData.dueDate && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs text-gray-500">{receiptData.dueDate.label}</span>
+                    <span className="text-sm font-medium text-gray-700 text-right max-w-[60%]">
+                      {receiptData.dueDate.value}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center py-2">
                   <span className="text-xs text-gray-500">Payment method</span>
                   <span className="text-sm font-medium text-gray-700 text-right max-w-[60%]">
@@ -435,7 +445,7 @@ const Confirmation = () => {
                 <div className="flex justify-between items-center py-2">
                   <span className="text-xs text-gray-500">Date</span>
                   <span className="text-sm font-medium text-gray-700">
-                    {timestamp ? new Date(timestamp).toLocaleDateString() : new Date().toLocaleDateString()}
+                    {receiptData.date}
                   </span>
                 </div>
                 
@@ -680,7 +690,7 @@ const Confirmation = () => {
                             <span className="font-semibold ml-1" style={{
                               color: daysUntilExpiry !== null && daysUntilExpiry < 7 ? colors.state.error : colors.text.primary
                             }}>
-                              {expiryDate.toLocaleDateString()}
+                              {formatDate(expiryDate)}
                             </span>
                           </div>
                         )}
@@ -701,7 +711,7 @@ const Confirmation = () => {
                   <div key={`receipt-${index}`} className="rounded-lg border border-green-200 overflow-hidden">
                     <div className="px-3 py-2 bg-green-600 text-white flex items-center justify-between text-xs">
                       <span>Receipt #{index + 1}</span>
-                      <span>{new Date().toLocaleString()}</span>
+                      <span>{receiptData.date}</span>
                     </div>
                     <div className="bg-white p-3 max-h-80 overflow-y-auto text-[11px] text-gray-800">
                       <div dangerouslySetInnerHTML={{ __html: html }} />

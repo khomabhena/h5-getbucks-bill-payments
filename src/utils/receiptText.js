@@ -5,9 +5,16 @@ import {
   resolveFulfillmentUserMessage,
 } from './fulfillmentMessages.js';
 import { stripHtml } from './stripHtml.js';
+import { formatDate, formatDateTime, formatDisplayValue } from './formatDate.js';
 import { describeBillIdentifierExtras } from './billIdentifierFields.js';
-import { getBillerDetailRows } from './billerDetails.js';
-import { getChargeBreakdown, resolveDebitAmount, resolveServiceCharge } from './billExtras.js';
+import { findDueDateRow, getBillerDetailRows } from './billerDetails.js';
+import { getAccountLabel } from './identifierLabel.js';
+import {
+  getChargeBreakdown,
+  getProductLabel,
+  resolveDebitAmount,
+  resolveServiceCharge,
+} from './billExtras.js';
 
 export const PAYMENT_METHOD_LABEL = 'GetBucks bank account';
 
@@ -79,7 +86,9 @@ export const buildBillPaymentReceiptData = ({
       ? [fulfillmentResult.receiptSmses]
       : [];
   const fulfillmentDisplayData = Array.isArray(fulfillmentResult?.displayData)
-    ? fulfillmentResult.displayData.filter((item) => item?.Value?.trim?.())
+    ? fulfillmentResult.displayData
+        .filter((item) => item?.Value?.trim?.())
+        .map((item) => ({ ...item, Value: formatDisplayValue(item.Value) }))
     : [];
 
   const accountName = getAccountName(validationData, accountValue);
@@ -89,6 +98,13 @@ export const buildBillPaymentReceiptData = ({
     extraValues: extraIdentifierValues,
     paymentCode,
   });
+  const billerDetailRows = getBillerDetailRows(validationData, {
+    omitLabels: identifierExtraRows.map((row) => row.label),
+    omitValues: [accountValue, accountName],
+  });
+  const dueDateRow =
+    findDueDateRow(fulfillmentDisplayData.map((item) => ({ label: item.Label, value: item.Value }))) ||
+    findDueDateRow(billerDetailRows);
   const statusLabel = resolveFulfillmentStatusLabel(fulfillmentResult);
   const statusDetail = resolveFulfillmentUserMessage(fulfillmentResult, {
     amount,
@@ -111,17 +127,17 @@ export const buildBillPaymentReceiptData = ({
     vasStatus: isFulfillmentPending(fulfillmentResult) ? 'PENDING' : fulfillmentResult?.status || null,
     paymentMethod: formatPaymentMethod(bankAccountNumber),
     providerName: provider?.Name || provider?.name || 'N/A',
+    productLabel: getProductLabel(product),
     productName: product?.Name || product?.name || 'N/A',
     productId: product?.Id || product?.id || null,
     addonName: selectedAddon?.Name || null,
+    accountLabel: getAccountLabel({ product, service, provider }),
     accountValue: accountValue || 'N/A',
     accountName: accountName && accountName !== accountValue ? accountName : null,
     notifyNumber: notifyNumber || null,
     identifierExtraRows,
-    billerDetailRows: getBillerDetailRows(validationData, {
-      omitLabels: identifierExtraRows.map((row) => row.label),
-      omitValues: [accountValue, accountName],
-    }),
+    billerDetailRows,
+    dueDate: dueDateRow,
     countryName: country?.countryName || null,
     serviceName: service?.Name || null,
     currency: currency.toUpperCase(),
@@ -132,7 +148,7 @@ export const buildBillPaymentReceiptData = ({
         : null,
     serviceCharge: serviceChargeValue > 0 ? formatCurrencyCode(serviceChargeValue, currency) : null,
     amountPaid: formatCurrencyCode(resolveDebitAmount(validationData, amount || 0, currency), currency),
-    date: timestamp ? new Date(timestamp).toLocaleString() : new Date().toLocaleString(),
+    date: formatDateTime(timestamp || undefined),
     fulfillmentDisplayData,
     vouchers,
     receiptTexts: receiptHTML
@@ -163,9 +179,10 @@ export const generateBillPaymentReceiptPlainText = (receiptData) => {
     '',
     'BILL DETAILS',
     `Biller: ${receiptData.providerName}`,
-    `Product: ${receiptData.productName}`,
+    `${receiptData.productLabel}: ${receiptData.productName}`,
     receiptData.addonName ? `Add-on: ${receiptData.addonName}` : null,
-    `Customer account: ${receiptData.accountValue}`,
+    receiptData.dueDate ? `${receiptData.dueDate.label}: ${receiptData.dueDate.value}` : null,
+    `${receiptData.accountLabel}: ${receiptData.accountValue}`,
     receiptData.accountName ? `Customer name: ${receiptData.accountName}` : null,
     receiptData.notifyNumber ? `Notification number: ${receiptData.notifyNumber}` : null,
     ...(receiptData.identifierExtraRows || []).map((row) => `${row.label}: ${row.value}`),
@@ -207,7 +224,7 @@ export const generateBillPaymentReceiptPlainText = (receiptData) => {
     if (token) lines.push(`Token: ${token}`);
     if (voucher.ValidDays !== undefined) lines.push(`Valid days: ${voucher.ValidDays}`);
     if (voucher.ExpiryDate) {
-      lines.push(`Expires: ${new Date(voucher.ExpiryDate).toLocaleDateString()}`);
+      lines.push(`Expires: ${formatDate(voucher.ExpiryDate)}`);
     }
     lines.push('');
   });
@@ -224,7 +241,7 @@ export const generateBillPaymentReceiptPlainText = (receiptData) => {
     lines.push('');
   });
 
-  lines.push(`Generated: ${new Date(receiptData.generatedAt).toLocaleString()}`);
+  lines.push(`Generated: ${formatDateTime(receiptData.generatedAt)}`);
 
   return lines.join('\n').trim();
 };

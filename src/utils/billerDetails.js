@@ -3,6 +3,8 @@
  * (e.g. client address, policy status, plan name, service provider).
  */
 
+import { formatDisplayValue } from './formatDate.js';
+
 /** Charge / limit rows are shown from TotalPayableAmountCalculations instead. */
 const CHARGE_AND_LIMIT_LABELS = new Set([
   'principalamount',
@@ -16,6 +18,13 @@ const CHARGE_AND_LIMIT_LABELS = new Set([
 ]);
 
 const normalizeLabel = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const DUE_DATE_LABEL = /^(due|expiry|expiration|expires|validuntil|validto|nextdue|renewal)(date)?$/;
+
+/** First due / expiry date row (e.g. DSTV "Due Date") from rows shaped { label, value }. */
+export function findDueDateRow(rows = []) {
+  return rows.find((row) => DUE_DATE_LABEL.test(normalizeLabel(row?.label))) || null;
+}
 
 /**
  * @param {Object} validationData - ValidatePayment response
@@ -44,5 +53,6 @@ export function getBillerDetailRows(validationData, { omitLabels = [], omitValue
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
-    });
+    })
+    .map((row) => ({ ...row, value: formatDisplayValue(row.value) }));
 }

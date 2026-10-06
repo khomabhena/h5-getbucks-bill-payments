@@ -39,6 +39,14 @@ export const getDisplayIdentifierLabel = (
   return fallbackLabel;
 };
 
+/** Label for the account value on summary / confirmation / receipt (e.g. DSTV "Smartcard Number"). */
+export const getAccountLabel = ({ product, service, provider } = {}) =>
+  getDisplayIdentifierLabel(product?.CreditPartyIdentifiers?.[0]?.Title, {
+    serviceName: service?.Name,
+    providerName: provider?.Name || provider?.name,
+    productName: product?.Name || product?.name,
+  });
+
 /**
  * Minimum characters before calling VAS validate (avoids errors while typing).
  */
