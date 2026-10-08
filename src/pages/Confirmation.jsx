@@ -678,7 +678,7 @@ const Confirmation = () => {
                       )}
 
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        {voucher.ValidDays !== undefined && (
+                        {Number(voucher.ValidDays) > 0 && (
                           <div className="bg-white rounded px-2 py-1 border" style={{ borderColor: colors.border.primary }}>
                             <span style={{ color: colors.text.secondary }}>Valid For:</span>
                             <span className="font-semibold ml-1" style={{ color: colors.text.primary }}>{voucher.ValidDays} days</span>

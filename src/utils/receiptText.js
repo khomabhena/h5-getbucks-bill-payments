@@ -222,7 +222,7 @@ export const generateBillPaymentReceiptPlainText = (receiptData) => {
     if (voucher.SerialNumber) lines.push(`Serial: ${voucher.SerialNumber}`);
     const token = receiptData.getVoucherToken(voucher);
     if (token) lines.push(`Token: ${token}`);
-    if (voucher.ValidDays !== undefined) lines.push(`Valid days: ${voucher.ValidDays}`);
+    if (Number(voucher.ValidDays) > 0) lines.push(`Valid days: ${voucher.ValidDays}`);
     if (voucher.ExpiryDate) {
       lines.push(`Expires: ${formatDate(voucher.ExpiryDate)}`);
     }
