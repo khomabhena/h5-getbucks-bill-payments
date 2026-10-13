@@ -23,6 +23,24 @@ export function supportsPayUsingReferenceNumber(product) {
   return product?.PayUsingReferenceNumberSupported === true;
 }
 
+/** Billers whose VAS Quantity is the number of months paid (DSTV also sets SpecifyQuantity; it stays at 1). */
+const MONTHS_PROVIDER_PATTERN = /NYARADZO/i;
+export const MAX_MONTHS = 12;
+
+export function supportsMonths(product) {
+  return (
+    product?.SpecifyQuantity === true &&
+    MONTHS_PROVIDER_PATTERN.test(String(product?.ServiceProvider?.Id || product?.Id || ''))
+  );
+}
+
+/** VAS Quantity: the number of months for monthly billers, otherwise 1. */
+export function resolveQuantity(product, months) {
+  if (!supportsMonths(product)) return 1;
+  const value = Number(months);
+  return Number.isInteger(value) && value >= 1 && value <= MAX_MONTHS ? value : 1;
+}
+
 export function resolveValidateAmount(baseAmount, selectedAddon) {
   const base = Number(baseAmount) || 0;
   const addonPrice = selectedAddon ? Number(selectedAddon.Price) || 0 : 0;

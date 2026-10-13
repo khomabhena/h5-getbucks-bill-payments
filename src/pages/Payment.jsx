@@ -30,10 +30,11 @@ const formatCurrencyDisplay = (amount, currency = 'USD') => {
 const Payment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { country, service, provider, product, accountValue, primaryFieldName, notifyNumber, amount, validationData, selectedAddon, payUsingReferenceNumber, extraIdentifierValues, paymentCode } = location.state || {};
+  const { country, service, provider, product, accountValue, primaryFieldName, notifyNumber, amount, validationData, selectedAddon, payUsingReferenceNumber, extraIdentifierValues, paymentCode, months } = location.state || {};
   const identifierExtraRows = describeBillIdentifierExtras(product, {
     extraValues: extraIdentifierValues,
     paymentCode,
+    months,
   });
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -106,6 +107,7 @@ const Payment = () => {
         payUsingReferenceNumber: Boolean(payUsingReferenceNumber),
         extraIdentifierValues: extraIdentifierValues || {},
         paymentCode: paymentCode || null,
+        months: months || null,
         accountNumber: accountNumber || null,
         clientNumber: clientNumber || null,
         valueDateCalendar,
@@ -163,6 +165,7 @@ const Payment = () => {
           postPaymentResult: paymentResult.postPaymentResult,
           extraIdentifierValues: extraIdentifierValues || {},
           paymentCode: paymentCode || null,
+          months: months || null,
           selectedAddon: selectedAddon || null,
           sessionID: sessionId || null,
           accountNumber: accountNumber || null,

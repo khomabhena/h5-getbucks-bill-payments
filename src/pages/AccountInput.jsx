@@ -28,12 +28,15 @@ import {
   buildSelectedProductAddOns,
   getChargeBreakdown,
   getProductAddOns,
+  MAX_MONTHS,
   resolveDebitAmount,
+  resolveQuantity,
   resolveServiceCharge,
   resolveValidateAmount,
   resolveValidationAmount,
   shouldDisplayCharges,
   supportsDstvAddOns,
+  supportsMonths,
   supportsPayUsingReferenceNumber,
 } from '../utils/billExtras';
 import { getBillerDetailRows } from '../utils/billerDetails';
@@ -95,6 +98,7 @@ const AccountInput = () => {
   const [validationError, setValidationError] = useState(null);
   const [extraValues, setExtraValues] = useState({});
   const [paymentCode, setPaymentCode] = useState('');
+  const [months, setMonths] = useState('1');
   // Product / amount / add-on the current validationData was quoted for (charges depend on them).
   const [validatedQuote, setValidatedQuote] = useState(null);
   const [confirmingAmount, setConfirmingAmount] = useState(false);
@@ -108,6 +112,8 @@ const AccountInput = () => {
   const showAddOns = supportsDstvAddOns(product);
   const productAddOns = getProductAddOns(product);
   const showReferenceToggle = supportsPayUsingReferenceNumber(product);
+  const showMonths = supportsMonths(product);
+  const quantity = resolveQuantity(product, months);
   const extraFields = getExtraIdentifierFields(product);
   const paymentCodeConfig = getPaymentCodeConfig(product);
   const selectedAddon =
@@ -146,6 +152,7 @@ const AccountInput = () => {
     setExtraValues({});
     autoFilledValuesRef.current = {};
     setPaymentCode('');
+    setMonths('1');
   }, [product?.Id]);
 
   // Redirect if no product selected
@@ -197,10 +204,15 @@ const AccountInput = () => {
   const selectedAddonRef = useRef(selectedAddon);
   const payUsingReferenceNumberRef = useRef(payUsingReferenceNumber);
   const paymentCodeRef = useRef(paymentCode);
+  const quantityRef = useRef(quantity);
 
   useEffect(() => {
     paymentCodeRef.current = paymentCode;
   }, [paymentCode]);
+
+  useEffect(() => {
+    quantityRef.current = quantity;
+  }, [quantity]);
   
   useEffect(() => {
     amountRef.current = amount;
@@ -282,7 +294,7 @@ const AccountInput = () => {
           TerminalId: 'GetBucks',
         },
         ProductId: product.Id || product.id,
-        Quantity: 1,
+        Quantity: quantityRef.current,
         PayUsingReferenceNumber: Boolean(payUsingReferenceNumberRef.current),
       };
 
@@ -350,6 +362,7 @@ const AccountInput = () => {
         productId: product.Id || product.id,
         amount: amountValue,
         addonCode: selectedAddonRef.current?.Code || '',
+        quantity: quantityRef.current,
       });
 
       applyValidationPrefill(data);
@@ -380,7 +393,7 @@ const AccountInput = () => {
 
   useEffect(() => {
     setQuoteError(null);
-  }, [amount, selectedAddonCode, selectedPackageId]);
+  }, [amount, selectedAddonCode, selectedPackageId, months]);
 
   const handleExtraValueChange = (fieldName, value) => {
     setExtraValues((prev) => ({ ...prev, [fieldName]: value }));
@@ -403,6 +416,7 @@ const AccountInput = () => {
           productId: product.Id || product.id,
           amount: amountValue,
           addonCode: selectedAddonCode || '',
+          quantity,
         });
       } catch (error) {
         console.error('Amount confirmation error:', error);
@@ -429,6 +443,7 @@ const AccountInput = () => {
         payUsingReferenceNumber: Boolean(payUsingReferenceNumber),
         extraIdentifierValues: cleanExtraValues(extraFields, extraValues),
         paymentCode: paymentCode || null,
+        months: showMonths ? quantity : null,
         validationData: finalValidation
           ? { ...finalValidation, BillAmount: billAmount ?? finalValidation.BillAmount }
           : null,
@@ -454,6 +469,7 @@ const AccountInput = () => {
     Boolean(validatedQuote) &&
     validatedQuote.productId === (product.Id || product.id) &&
     validatedQuote.addonCode === (selectedAddonCode || '') &&
+    validatedQuote.quantity === quantity &&
     Math.abs(validatedQuote.amount - amountValue) < 0.005;
   const displayBillAmount = isQuoteCurrent
     ? resolveDisplayBillAmount(validationData, amount, isFixedAmount)
@@ -911,6 +927,26 @@ const AccountInput = () => {
                   </label>
                 ))}
               </div>
+            </Card>
+          )}
+
+          {showMonths && (
+            <Card className="mb-4">
+              <label htmlFor="months" className="block text-sm font-medium mb-2 text-gray-700">
+                Number of months
+              </label>
+              <select
+                id="months"
+                value={months}
+                onChange={(e) => setMonths(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border border-gray-200 bg-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-offset-1 focus:border-[#faa819] focus:ring-[#faa819]"
+              >
+                {Array.from({ length: MAX_MONTHS }, (_, index) => index + 1).map((count) => (
+                  <option key={count} value={String(count)}>
+                    {count} {count === 1 ? 'month' : 'months'}
+                  </option>
+                ))}
+              </select>
             </Card>
           )}
 

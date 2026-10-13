@@ -6,6 +6,8 @@
  * PostPayment sends every identifier with its own value.
  */
 
+import { resolveQuantity, supportsMonths } from './billExtras.js';
+
 export const PAYMENT_REASON_MAX_LENGTH = 13;
 
 const FIELD_PRESETS = {
@@ -242,11 +244,17 @@ export function getExtraValuesFromValidation(product, validationData) {
 }
 
 /** Label / value rows for order summary, confirmation and receipt. */
-export function describeBillIdentifierExtras(product, { extraValues = {}, paymentCode = null } = {}) {
+export function describeBillIdentifierExtras(
+  product,
+  { extraValues = {}, paymentCode = null, months = null } = {}
+) {
   const rows = [];
 
   const paymentCodeLabel = getPaymentCodeLabel(product, paymentCode);
   if (paymentCodeLabel) rows.push({ label: 'Payment type', value: paymentCodeLabel });
+  if (supportsMonths(product)) {
+    rows.push({ label: 'Number of months', value: String(resolveQuantity(product, months)) });
+  }
 
   for (const field of getExtraIdentifierFields(product)) {
     const value = String(extraValues?.[field.name] ?? '').trim();

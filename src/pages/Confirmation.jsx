@@ -79,6 +79,7 @@ const Confirmation = () => {
     postPaymentResult,
     extraIdentifierValues,
     paymentCode,
+    months,
     selectedAddon,
     accountNumber,
   } = location.state || {};
@@ -109,6 +110,7 @@ const Confirmation = () => {
       postPaymentResult,
       extraIdentifierValues,
       paymentCode,
+      months,
       selectedAddon,
       bankAccountNumber: accountNumber,
     }),
@@ -129,14 +131,15 @@ const Confirmation = () => {
       postPaymentResult,
       extraIdentifierValues,
       paymentCode,
+      months,
       selectedAddon,
       accountNumber,
     ]
   );
 
   const identifierExtraRows = useMemo(
-    () => describeBillIdentifierExtras(product, { extraValues: extraIdentifierValues, paymentCode }),
-    [product, extraIdentifierValues, paymentCode]
+    () => describeBillIdentifierExtras(product, { extraValues: extraIdentifierValues, paymentCode, months }),
+    [product, extraIdentifierValues, paymentCode, months]
   );
 
   const receiptData = useMemo(() => buildBillPaymentReceiptData(receiptInput), [receiptInput]);

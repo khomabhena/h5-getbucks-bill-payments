@@ -10,6 +10,7 @@ import {
 import { productRequiresValidation } from '../../utils/productValidation.js';
 import {
   buildSelectedProductAddOns,
+  resolveQuantity,
   resolveVasPostAmount,
 } from '../../utils/billExtras.js';
 
@@ -162,6 +163,7 @@ export function buildValidatePaymentPayload({
   payUsingReferenceNumber = false,
   selectedAddon = null,
   paymentCode = null,
+  months = null,
 }) {
   const resolvedCustomer = resolveCustomerDetailsForVas(customerDetails);
   const creditParty = buildCreditPartySection({
@@ -185,7 +187,7 @@ export function buildValidatePaymentPayload({
       TerminalId: 'GetBucks',
     },
     ProductId: product?.Id || product?.id,
-    Quantity: 1,
+    Quantity: resolveQuantity(product, months),
     PayUsingReferenceNumber: Boolean(payUsingReferenceNumber),
   };
 
@@ -220,6 +222,7 @@ export function buildPostPaymentPayload({
   selectedAddon = null,
   extraIdentifierValues = {},
   paymentCode = null,
+  months = null,
 }) {
   const fulfillmentValidation = validationData || {};
   const resolvedRequestId =
@@ -277,7 +280,7 @@ export function buildPostPaymentPayload({
       null,
     PaymentChannel: 'BankAccount',
     PaymentReferenceNumber: paymentReference,
-    Quantity: 1,
+    Quantity: resolveQuantity(product, months),
     Currency: currencyCode,
     Amount: resolveVasPostAmount(fulfillmentValidation, fallbackAmount),
     CustomerDetails: resolvedCustomer,

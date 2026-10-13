@@ -150,6 +150,7 @@ class BankPaymentService {
       payUsingReferenceNumber: paymentData.payUsingReferenceNumber,
       selectedAddon: paymentData.selectedAddon,
       paymentCode: paymentData.paymentCode,
+      months: paymentData.months,
     });
 
     const result = await validateBillPayment(payload);
@@ -201,6 +202,7 @@ class BankPaymentService {
       selectedAddon: paymentData.selectedAddon,
       extraIdentifierValues: paymentData.extraIdentifierValues,
       paymentCode: paymentData.paymentCode,
+      months: paymentData.months,
     });
 
     console.log('📤 VAS PostPayment (bill):', payload);

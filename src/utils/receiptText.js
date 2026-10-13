@@ -65,6 +65,7 @@ export const buildBillPaymentReceiptData = ({
   postPaymentResult,
   extraIdentifierValues,
   paymentCode,
+  months,
   selectedAddon,
   bankAccountNumber,
 }) => {
@@ -97,6 +98,7 @@ export const buildBillPaymentReceiptData = ({
   const identifierExtraRows = describeBillIdentifierExtras(product, {
     extraValues: extraIdentifierValues,
     paymentCode,
+    months,
   });
   const billerDetailRows = getBillerDetailRows(validationData, {
     omitLabels: identifierExtraRows.map((row) => row.label),
