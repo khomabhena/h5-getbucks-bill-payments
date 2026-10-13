@@ -88,6 +88,22 @@ export function getChargeBreakdown(validationData) {
 }
 
 /** Show charge lines when VAS returned calculations and there are charges (or CheckCharges). */
+/** Amount the biller worked out on validation (Nyaradzo: monthly premium × number of months). */
+export function getValidatedPrincipal(validationData) {
+  const breakdown = getChargeBreakdown(validationData);
+  if (breakdown && breakdown.principalAmount > 0) return breakdown.principalAmount;
+  const billAmount = Number(validationData?.BillAmount);
+  return billAmount > 0 ? billAmount : null;
+}
+
+export function getMonthlyPremium(validationData) {
+  const row = (validationData?.DisplayData || []).find((item) =>
+    /monthly premium/i.test(item?.Label || '')
+  );
+  const value = parseFloat(row?.Value);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 export function shouldDisplayCharges(product, validationData) {
   const breakdown = getChargeBreakdown(validationData);
   if (!breakdown) return false;

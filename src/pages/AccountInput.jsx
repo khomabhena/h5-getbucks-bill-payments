@@ -27,7 +27,9 @@ import { getServiceIconName } from '../utils/serviceIcons';
 import {
   buildSelectedProductAddOns,
   getChargeBreakdown,
+  getMonthlyPremium,
   getProductAddOns,
+  getValidatedPrincipal,
   MAX_MONTHS,
   resolveDebitAmount,
   resolveQuantity,
@@ -357,10 +359,14 @@ const AccountInput = () => {
       const data = await requestValidation(amountValue);
       if (currentValidationRequestRef.current !== attemptId) return;
 
+      // Monthly billers (Nyaradzo) price the payment themselves: premium × number of months.
+      const billerAmount = supportsMonths(product) ? getValidatedPrincipal(data) : null;
+      if (billerAmount != null) setAmount(String(billerAmount));
+
       setValidationData(data);
       setValidatedQuote({
         productId: product.Id || product.id,
-        amount: amountValue,
+        amount: billerAmount ?? amountValue,
         addonCode: selectedAddonRef.current?.Code || '',
         quantity: quantityRef.current,
       });
@@ -373,6 +379,7 @@ const AccountInput = () => {
       setValidationError(getValidationErrorMessage(error, currentAccountValue));
       setValidationData(null);
       setValidatedQuote(null);
+      if (supportsMonths(product)) setAmount('');
     } finally {
       if (currentValidationRequestRef.current === attemptId) {
         setValidating(false);
@@ -389,7 +396,8 @@ const AccountInput = () => {
     setValidationError(null);
     setQuoteError(null);
     setValidating(false);
-  }, [accountValue, notifyNumber, payUsingReferenceNumber, paymentCode]);
+    if (showMonths) setAmount('');
+  }, [accountValue, notifyNumber, payUsingReferenceNumber, paymentCode, showMonths]);
 
   useEffect(() => {
     setQuoteError(null);
@@ -402,7 +410,7 @@ const AccountInput = () => {
   const handleContinue = async () => {
     if (!product || !country || !service || !provider) return;
 
-    const amountValue = parseFloat(amount);
+    let amountValue = parseFloat(amount);
     let finalValidation = validationData;
 
     // Charges and the RequestId used by PostPayment must match the amount actually being paid.
@@ -411,6 +419,10 @@ const AccountInput = () => {
       setQuoteError(null);
       try {
         finalValidation = await requestValidation(amountValue);
+        if (showMonths) {
+          amountValue = getValidatedPrincipal(finalValidation) ?? amountValue;
+          setAmount(String(amountValue));
+        }
         setValidationData(finalValidation);
         setValidatedQuote({
           productId: product.Id || product.id,
@@ -501,7 +513,17 @@ const AccountInput = () => {
     !awaitingPackage &&
     !paymentCodeMissing &&
     !hasExtraFieldErrors &&
-    (!validationRequired || hasAttemptedValidation);
+    (!validationRequired || hasAttemptedValidation) &&
+    (!showMonths || isValidationSuccessful);
+
+  const monthlyPremium = showMonths && isValidationSuccessful ? getMonthlyPremium(validationData) : null;
+
+  // The biller re-prices on the new number of months, so re-validate straight away.
+  const handleMonthsChange = (value) => {
+    setMonths(value);
+    quantityRef.current = resolveQuantity(product, value);
+    if (hasAttemptedValidation) performValidation();
+  };
 
   return (
     <PageWrapper>
@@ -938,7 +960,8 @@ const AccountInput = () => {
               <select
                 id="months"
                 value={months}
-                onChange={(e) => setMonths(e.target.value)}
+                onChange={(e) => handleMonthsChange(e.target.value)}
+                disabled={validating}
                 className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border border-gray-200 bg-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-offset-1 focus:border-[#faa819] focus:ring-[#faa819]"
               >
                 {Array.from({ length: MAX_MONTHS }, (_, index) => index + 1).map((count) => (
@@ -956,19 +979,32 @@ const AccountInput = () => {
               <InputField
                 type="number"
                 label="Payment Amount"
-                placeholder={isFixedAmount ? "Fixed amount" : `Enter amount (${currency})`}
+                placeholder={
+                  showMonths
+                    ? 'Validate to get the amount'
+                    : isFixedAmount
+                      ? "Fixed amount"
+                      : `Enter amount (${currency})`
+                }
                 value={amount}
                 onChange={(e) => {
-                  if (!isFixedAmount) {
+                  if (!isFixedAmount && !showMonths) {
                     setAmount(e.target.value);
                   }
                 }}
-                disabled={isFixedAmount}
+                disabled={isFixedAmount || showMonths}
                 required
               />
 
+              {monthlyPremium && (
+                <div className="mt-2 text-xs text-gray-500">
+                  Monthly premium {currency} {monthlyPremium.toFixed(2)} × {quantity}{' '}
+                  {quantity === 1 ? 'month' : 'months'}
+                </div>
+              )}
+
               {/* Amount limits display */}
-              {!isFixedAmount && (minAmount > 0 || maxAmount > 0) && (
+              {!isFixedAmount && !showMonths && (minAmount > 0 || maxAmount > 0) && (
                 <div
                   className={`mt-2 text-xs ${
                     amount && (isAmountBelowMin || isAmountAboveMax) ? 'text-red-600' : 'text-gray-500'
