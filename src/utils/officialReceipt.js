@@ -1,34 +1,28 @@
 /**
  * ZB VAS official PDF proof of payment helpers.
  * Sp3ndl (South Africa) does not expose DownloadReceipt — only ZB when ReceiptPDFAvailable.
+ *
+ * DownloadReceipt?Id= must be the PostPayment RequestId (GUID). Receipt Number / ReferenceNumber
+ * are display fields only — VAS rejects them ("The value '…' is not valid").
  */
 
-/** Receipt Number from PostPayment DisplayData (same value used as DownloadReceipt Id). */
+const GUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** DownloadReceipt Id = PostPayment RequestId (GUID). */
 export function resolveOfficialReceiptId(postPaymentResult) {
   if (!postPaymentResult) return null;
 
-  const displayData =
-    postPaymentResult.displayData ||
-    postPaymentResult.raw?.DisplayData ||
-    postPaymentResult.data?.DisplayData ||
-    [];
+  const candidates = [
+    postPaymentResult.requestId,
+    postPaymentResult.receiptId,
+    postPaymentResult.raw?.RequestId,
+    postPaymentResult.data?.RequestId,
+  ];
 
-  const fromDisplay = (Array.isArray(displayData) ? displayData : []).find((item) =>
-    /receipt\s*number/i.test(String(item?.Label || ''))
-  )?.Value;
-  if (fromDisplay != null && String(fromDisplay).trim()) {
-    return String(fromDisplay).trim();
-  }
-
-  const receiptJSON =
-    postPaymentResult.receiptJSON ||
-    postPaymentResult.raw?.ReceiptJSON ||
-    postPaymentResult.data?.ReceiptJSON;
-  if (receiptJSON?.popReference) return String(receiptJSON.popReference).trim();
-  if (receiptJSON?.orderReference) return String(receiptJSON.orderReference).trim();
-
-  if (postPaymentResult.referenceNumber) {
-    return String(postPaymentResult.referenceNumber).trim();
+  for (const value of candidates) {
+    const id = String(value || '').trim();
+    if (GUID_PATTERN.test(id)) return id;
   }
 
   return null;

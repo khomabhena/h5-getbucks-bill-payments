@@ -310,29 +310,22 @@ export function mapVasPaymentToUiResult(response, requestId) {
   const isPending = !isSuccess && PENDING_STATUS_PATTERN.test(String(response?.Status || ''));
   const receiptHTML = response?.ReceiptHTML;
   const receiptSmses = response?.ReceiptSmses;
-  const displayData = response?.DisplayData || [];
-  const receiptNumber = displayData.find((item) =>
-    /receipt\s*number/i.test(String(item?.Label || ''))
-  )?.Value;
+  const resolvedRequestId = response?.RequestId || requestId;
 
   return {
     success: isSuccess,
     status: response?.Status,
-    requestId: response?.RequestId || requestId,
+    requestId: resolvedRequestId,
     referenceNumber: response?.ReferenceNumber,
     resultMessage: response?.ResultMessage || response?.ResultInformation || response?.Message,
     vouchers: response?.Vouchers || [],
     receiptHTML: Array.isArray(receiptHTML) ? receiptHTML : receiptHTML ? [receiptHTML] : [],
     receiptSmses: Array.isArray(receiptSmses) ? receiptSmses : receiptSmses ? [receiptSmses] : [],
-    displayData,
+    displayData: response?.DisplayData || [],
     receiptPDFAvailable: response?.ReceiptPDFAvailable === true,
     receiptJSON: response?.ReceiptJSON || null,
-    // DownloadReceipt Id = Receipt Number (not RequestId)
-    receiptId:
-      (receiptNumber != null && String(receiptNumber).trim()) ||
-      response?.ReceiptJSON?.popReference ||
-      response?.ReferenceNumber ||
-      null,
+    // DownloadReceipt Id = RequestId (GUID); Receipt Number is display-only
+    receiptId: resolvedRequestId || null,
     isRetryable,
     isFailedRepeatable: isRetryable,
     isPending,

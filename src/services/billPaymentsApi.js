@@ -50,7 +50,7 @@ export const postBillPayment = async (paymentData) => {
   }
 };
 
-/** Official ZB PDF; receiptId = PostPayment Receipt Number. */
+/** Official ZB PDF; receiptId = PostPayment RequestId (GUID). */
 export async function downloadOfficialReceiptPdf(receiptId) {
   const id = String(receiptId || '').trim();
   if (!id) throw new Error('Receipt Id is required');
