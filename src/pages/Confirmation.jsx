@@ -15,8 +15,13 @@ import {
   generateBillPaymentReceiptPlainText,
   getReceiptFileName,
 } from '../utils/receiptText';
-import { downloadReceiptFile } from '../utils/downloadReceipt';
+import { downloadBlobFile, downloadReceiptFile } from '../utils/downloadReceipt';
 import { describeBillIdentifierExtras } from '../utils/billIdentifierFields';
+import {
+  isOfficialReceiptPdfAvailable,
+  resolveOfficialReceiptId,
+} from '../utils/officialReceipt';
+import { downloadOfficialReceiptPdf } from '../services/billPaymentsApi';
 import { copyText } from '../utils/copyText';
 import { formatDate } from '../utils/formatDate';
 
@@ -148,13 +153,41 @@ const Confirmation = () => {
     [receiptData]
   );
 
+  const officialReceiptAvailable = isOfficialReceiptPdfAvailable(postPaymentResult);
+  const officialReceiptId = resolveOfficialReceiptId(postPaymentResult);
+
   const handleDownloadReceipt = useCallback(async () => {
+    // ZB: official PDF via DownloadReceipt when ReceiptPDFAvailable.
+    // Sp3ndl / others: keep the local text proof of payment.
+    if (officialReceiptAvailable && officialReceiptId) {
+      try {
+        setReceiptDownloadStatus('fetching');
+        const blob = await downloadOfficialReceiptPdf(officialReceiptId);
+        const safeId = String(officialReceiptId).replace(/[^\w.-]+/g, '_').slice(0, 80);
+        const result = await downloadBlobFile(
+          blob,
+          `proof-of-payment-${safeId}.pdf`,
+          'Proof of payment'
+        );
+        setReceiptDownloadStatus(result);
+      } catch (error) {
+        console.error('Official receipt download failed:', error);
+        setReceiptDownloadStatus('failed');
+      }
+      return;
+    }
+
     const result = await downloadReceiptFile(
       receiptPlainText,
       getReceiptFileName(finalTransactionId)
     );
     setReceiptDownloadStatus(result);
-  }, [receiptPlainText, finalTransactionId]);
+  }, [
+    officialReceiptAvailable,
+    officialReceiptId,
+    receiptPlainText,
+    finalTransactionId,
+  ]);
 
   const handleCopyReceipt = useCallback(
     async (source = 'manual') => {
@@ -782,7 +815,9 @@ const Confirmation = () => {
             )}
             {receiptDownloadStatus === 'failed' && (
               <p className="text-xs text-center text-amber-700">
-                Could not save the file on this device. Use Copy receipt info instead.
+                {officialReceiptAvailable
+                  ? 'Could not download the official receipt. Try again or use Copy receipt.'
+                  : 'Could not save the file on this device. Use Copy receipt instead.'}
               </p>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -791,10 +826,15 @@ const Confirmation = () => {
                 variant="secondary"
                 fullWidth
                 size="lg"
+                disabled={receiptDownloadStatus === 'fetching'}
               >
-                {receiptDownloadStatus === 'downloaded' || receiptDownloadStatus === 'shared'
-                  ? 'Saved'
-                  : 'Download proof'}
+                {receiptDownloadStatus === 'fetching'
+                  ? 'Downloading…'
+                  : receiptDownloadStatus === 'downloaded' || receiptDownloadStatus === 'shared'
+                    ? 'Saved'
+                    : officialReceiptAvailable
+                      ? 'Official PDF'
+                      : 'Download proof'}
               </Button>
               <Button
                 onClick={() => handleCopyReceipt('manual')}

@@ -310,6 +310,10 @@ export function mapVasPaymentToUiResult(response, requestId) {
   const isPending = !isSuccess && PENDING_STATUS_PATTERN.test(String(response?.Status || ''));
   const receiptHTML = response?.ReceiptHTML;
   const receiptSmses = response?.ReceiptSmses;
+  const displayData = response?.DisplayData || [];
+  const receiptNumber = displayData.find((item) =>
+    /receipt\s*number/i.test(String(item?.Label || ''))
+  )?.Value;
 
   return {
     success: isSuccess,
@@ -320,7 +324,15 @@ export function mapVasPaymentToUiResult(response, requestId) {
     vouchers: response?.Vouchers || [],
     receiptHTML: Array.isArray(receiptHTML) ? receiptHTML : receiptHTML ? [receiptHTML] : [],
     receiptSmses: Array.isArray(receiptSmses) ? receiptSmses : receiptSmses ? [receiptSmses] : [],
-    displayData: response?.DisplayData || [],
+    displayData,
+    receiptPDFAvailable: response?.ReceiptPDFAvailable === true,
+    receiptJSON: response?.ReceiptJSON || null,
+    // DownloadReceipt Id = Receipt Number (not RequestId)
+    receiptId:
+      (receiptNumber != null && String(receiptNumber).trim()) ||
+      response?.ReceiptJSON?.popReference ||
+      response?.ReferenceNumber ||
+      null,
     isRetryable,
     isFailedRepeatable: isRetryable,
     isPending,
@@ -352,6 +364,9 @@ export function mapVasPaymentErrorToUiResult(error, requestId) {
     receiptHTML: [],
     receiptSmses: [],
     displayData: upstream.DisplayData || [],
+    receiptPDFAvailable: false,
+    receiptJSON: null,
+    receiptId: null,
     isRetryable: status === 'FAILEDREPEATABLE',
     isFailedRepeatable: status === 'FAILEDREPEATABLE',
     isPending: PENDING_STATUS_PATTERN.test(String(status)),

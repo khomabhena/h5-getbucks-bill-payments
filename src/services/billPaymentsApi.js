@@ -50,7 +50,32 @@ export const postBillPayment = async (paymentData) => {
   }
 };
 
+/** Official ZB PDF; receiptId = PostPayment Receipt Number. */
+export async function downloadOfficialReceiptPdf(receiptId) {
+  const id = String(receiptId || '').trim();
+  if (!id) throw new Error('Receipt Id is required');
+
+  const response = await fetch(`${vasPaymentUrl}/receipt?id=${encodeURIComponent(id)}`, {
+    method: 'GET',
+    headers: { Accept: 'application/pdf' },
+  });
+
+  if (!response.ok) {
+    let message = `Download failed (${response.status})`;
+    try {
+      const data = await response.json();
+      message = data.error || data.ResultMessage || message;
+    } catch {
+      // PDF error bodies may not be JSON
+    }
+    throw new Error(message);
+  }
+
+  return response.blob();
+}
+
 export default {
   validateBillPayment,
   postBillPayment,
+  downloadOfficialReceiptPdf,
 };
