@@ -7,7 +7,7 @@ import {
 import { stripHtml } from './stripHtml.js';
 import { formatDate, formatDateTime, formatDisplayValue } from './formatDate.js';
 import { describeBillIdentifierExtras } from './billIdentifierFields.js';
-import { findDueDateRow, getBillerDetailRows } from './billerDetails.js';
+import { findDueDateRow, getBillerDetailRows, isAccountNameLabel } from './billerDetails.js';
 import { getAccountLabel } from './identifierLabel.js';
 import {
   getChargeBreakdown,
@@ -37,13 +37,9 @@ const getVoucherToken = (voucher = {}) =>
   voucher.Code ||
   null;
 
-const getAccountName = (validationData, accountValue) => {
+export const getAccountName = (validationData, accountValue) => {
   if (validationData?.DisplayData) {
-    const accountNameItem = validationData.DisplayData.find(
-      (item) =>
-        item.Label?.toLowerCase().includes('account name') ||
-        item.Label?.toLowerCase().includes('name')
-    );
+    const accountNameItem = validationData.DisplayData.find((item) => isAccountNameLabel(item.Label));
     return accountNameItem?.Value || accountValue;
   }
   return accountValue;

@@ -60,8 +60,10 @@ export function resolveCustomerDetailsForVas(details = {}) {
 function deriveAccountNameFromValidation(validationData, accountValue) {
   if (validationData?.DisplayData) {
     const nameEntry = validationData.DisplayData.find((item = {}) => {
-      const label = item.Label?.toLowerCase() || '';
-      return label.includes('name');
+      const key = String(item.Label || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+      return key === 'accountname' || key === 'customername' || key === 'clientname';
     });
     if (nameEntry?.Value) {
       return nameEntry.Value;

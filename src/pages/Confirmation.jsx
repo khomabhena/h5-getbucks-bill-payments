@@ -13,6 +13,7 @@ import {
 import {
   buildBillPaymentReceiptData,
   generateBillPaymentReceiptPlainText,
+  getAccountName,
   getReceiptFileName,
 } from '../utils/receiptText';
 import { downloadBlobFile, downloadReceiptFile } from '../utils/downloadReceipt';
@@ -234,19 +235,7 @@ const Confirmation = () => {
     navigate('/');
   };
 
-  // Get account name from validation data
-  const getAccountName = () => {
-    if (validationData?.DisplayData) {
-      const accountNameItem = validationData.DisplayData.find(item => 
-        item.Label?.toLowerCase().includes('account name') || 
-        item.Label?.toLowerCase().includes('name')
-      );
-      return accountNameItem?.Value || accountValue;
-    }
-    return accountValue;
-  };
-
-  const accountName = getAccountName();
+  const accountName = getAccountName(validationData, accountValue);
   const currency = product?.Currency || product?.currency || 'USD';
   const fulfillmentResult = postPaymentResult || null;
   const fulfillmentContext = {

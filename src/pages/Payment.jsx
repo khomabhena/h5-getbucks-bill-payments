@@ -17,7 +17,7 @@ import {
 import { describeBillIdentifierExtras } from '../utils/billIdentifierFields';
 import { getBillerDetailRows } from '../utils/billerDetails';
 import { getAccountLabel } from '../utils/identifierLabel';
-import { formatPaymentMethod } from '../utils/receiptText';
+import { formatPaymentMethod, getAccountName } from '../utils/receiptText';
 
 // Local currency formatter (code + rounded amount)
 const formatCurrencyDisplay = (amount, currency = 'USD') => {
@@ -51,17 +51,6 @@ const Payment = () => {
     }
   }, [product, country, service, provider, accountValue, amount, navigate]);
 
-  // Get account name from validation data
-  const getAccountName = () => {
-    if (validationData?.DisplayData) {
-      const accountNameItem = validationData.DisplayData.find(item => 
-        item.Label?.toLowerCase().includes('account name') || 
-        item.Label?.toLowerCase().includes('name')
-      );
-      return accountNameItem?.Value || accountValue;
-    }
-    return accountValue;
-  };
 
 
   const handlePayment = async () => {
@@ -214,7 +203,7 @@ const Payment = () => {
   }
 
   const currency = product?.Currency || product?.currency || accountCurrency || 'USD';
-  const accountName = getAccountName();
+  const accountName = getAccountName(validationData, accountValue);
   const debitAmount = resolveDebitAmount(validationData, amount, currency);
   const serviceCharge = resolveServiceCharge(validationData, amount, currency);
   const chargeBreakdown = getChargeBreakdown(validationData);
